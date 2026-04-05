@@ -6,16 +6,19 @@ const currentHost = typeof window !== 'undefined' ? window.location.hostname : '
 const isLocalhost = LOCAL_HOSTS.has(currentHost)
 
 const normalizeUrl = (value) => (value ? value.replace(/\/+$/, '') : value)
+const isLocalUrl = (value) => /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(value || '')
 
 const envApiBaseUrl = normalizeUrl(import.meta.env.VITE_API_BASE_URL)
 const envBackendBaseUrl = normalizeUrl(import.meta.env.VITE_BACKEND_BASE_URL)
+const safeEnvApiBaseUrl = !isLocalhost && isLocalUrl(envApiBaseUrl) ? null : envApiBaseUrl
+const safeEnvBackendBaseUrl = !isLocalhost && isLocalUrl(envBackendBaseUrl) ? null : envBackendBaseUrl
 
 const backendBaseUrl =
-  envBackendBaseUrl ||
-  (envApiBaseUrl ? envApiBaseUrl.replace(/\/api$/i, '') : null) ||
+  safeEnvBackendBaseUrl ||
+  (safeEnvApiBaseUrl ? safeEnvApiBaseUrl.replace(/\/api$/i, '') : null) ||
   (isLocalhost ? 'http://localhost:5001' : DEFAULT_PROD_BACKEND_BASE_URL)
 
-const API_BASE_URL = envApiBaseUrl || `${backendBaseUrl}/api`
+const API_BASE_URL = safeEnvApiBaseUrl || `${backendBaseUrl}/api`
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('ojas_token')

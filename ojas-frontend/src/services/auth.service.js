@@ -5,18 +5,29 @@ const currentHost = typeof window !== 'undefined' ? window.location.hostname : '
 const isLocalhost = LOCAL_HOSTS.has(currentHost)
 
 const normalizeUrl = (value) => (value ? value.replace(/\/+$/, '') : value)
+const isLocalUrl = (value) => /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(value || '')
 
 const envApiBaseUrl = normalizeUrl(import.meta.env.VITE_API_BASE_URL)
 const envBackendBaseUrl = normalizeUrl(import.meta.env.VITE_BACKEND_BASE_URL)
+const safeEnvApiBaseUrl = !isLocalhost && isLocalUrl(envApiBaseUrl) ? null : envApiBaseUrl
+const safeEnvBackendBaseUrl = !isLocalhost && isLocalUrl(envBackendBaseUrl) ? null : envBackendBaseUrl
 
 const BACKEND_BASE_URL =
-  envBackendBaseUrl ||
-  (envApiBaseUrl ? envApiBaseUrl.replace(/\/api$/i, '') : null) ||
+  safeEnvBackendBaseUrl ||
+  (safeEnvApiBaseUrl ? safeEnvApiBaseUrl.replace(/\/api$/i, '') : null) ||
   (isLocalhost ? 'http://localhost:5001' : DEFAULT_PROD_BACKEND_BASE_URL)
 
 const API_BASE_URL =
-  envApiBaseUrl ||
+  safeEnvApiBaseUrl ||
   `${BACKEND_BASE_URL}/api`
+
+const getGoogleAuthBaseUrl = () => {
+  if (isLocalhost) {
+    return BACKEND_BASE_URL
+  }
+
+  return DEFAULT_PROD_BACKEND_BASE_URL
+}
 
 const parseResponse = async (response) => {
   const json = await response.json().catch(() => null)
@@ -70,7 +81,8 @@ const getAuthHeaders = () => {
 }
 
 export const continueWithGoogle = () => {
-  window.location.href = `${BACKEND_BASE_URL}/auth/google`
+  const redirectBaseUrl = getGoogleAuthBaseUrl()
+  window.location.href = `${redirectBaseUrl}/auth/google`
 }
 
 export const createSubAdminUser = async ({ name, email, password }) => {
