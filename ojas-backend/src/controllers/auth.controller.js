@@ -9,6 +9,7 @@ const createToken = (user) => {
       userId: user._id.toString(),
       email: user.email,
       role: user.role,
+      isRoleSelected: user.isRoleSelected,
     },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }

@@ -21,10 +21,10 @@ export default function Login() {
 
     const completeGoogleLogin = async () => {
       try {
-        await loginWithToken(oauthToken)
+        const userData = await loginWithToken(oauthToken)
         
         // If role selection is needed, redirect to role selection page
-        if (needsRoleSelection) {
+        if (!userData.isRoleSelected) {
           navigate('/select-role')
         } else {
           navigate('/')
@@ -37,7 +37,9 @@ export default function Login() {
     completeGoogleLogin()
   }, [searchParams, loginWithToken, navigate])
 
-  if (!loading && isAuthenticated) {
+  // Only check isAuthenticated if we're not processing OAuth callback
+  const isProcessingOAuth = searchParams.has('token')
+  if (!loading && isAuthenticated && !isProcessingOAuth) {
     return <Navigate to="/" replace />
   }
 
