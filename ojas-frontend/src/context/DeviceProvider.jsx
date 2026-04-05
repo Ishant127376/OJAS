@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { getDevices, getAlerts } from '../services/device.service'
 import { DeviceContext } from './DeviceContext'
+import { useAuth } from '../hooks/useAuth'
 
 export function DeviceProvider({ children }) {
+  const { token, loading: authLoading, isAuthenticated } = useAuth()
   const [devices, setDevices] = useState([])
   const [alerts, setAlerts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -23,8 +25,21 @@ export function DeviceProvider({ children }) {
       }
     }
 
+    if (authLoading) {
+      return
+    }
+
+    if (!isAuthenticated || !token) {
+      setDevices([])
+      setAlerts([])
+      setError(null)
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
     loadData()
-  }, [])
+  }, [authLoading, isAuthenticated, token])
 
   const value = {
     devices,
