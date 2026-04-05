@@ -76,6 +76,7 @@ export const getMe = async (token) => {
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('ojas_token')
+  console.log('[AuthService] Token from localStorage:', token ? 'EXISTS' : 'MISSING')
   return {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
