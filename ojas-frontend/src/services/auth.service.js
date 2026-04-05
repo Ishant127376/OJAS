@@ -1,17 +1,22 @@
-const PROD_FRONTEND_HOSTS = new Set(['ojas-ddr.pages.dev', 'www.ojas-ddr.pages.dev'])
 const DEFAULT_PROD_BACKEND_BASE_URL = 'https://ojas-r00n.onrender.com'
 
-const isHostedFrontend =
-  typeof window !== 'undefined' && PROD_FRONTEND_HOSTS.has(window.location.hostname)
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1'])
+const currentHost = typeof window !== 'undefined' ? window.location.hostname : ''
+const isLocalhost = LOCAL_HOSTS.has(currentHost)
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  (isHostedFrontend
-    ? `${DEFAULT_PROD_BACKEND_BASE_URL}/api`
-    : 'http://localhost:5001/api')
+const normalizeUrl = (value) => (value ? value.replace(/\/+$/, '') : value)
+
+const envApiBaseUrl = normalizeUrl(import.meta.env.VITE_API_BASE_URL)
+const envBackendBaseUrl = normalizeUrl(import.meta.env.VITE_BACKEND_BASE_URL)
 
 const BACKEND_BASE_URL =
-  import.meta.env.VITE_BACKEND_BASE_URL || API_BASE_URL.replace(/\/api\/?$/, '')
+  envBackendBaseUrl ||
+  (envApiBaseUrl ? envApiBaseUrl.replace(/\/api$/i, '') : null) ||
+  (isLocalhost ? 'http://localhost:5001' : DEFAULT_PROD_BACKEND_BASE_URL)
+
+const API_BASE_URL =
+  envApiBaseUrl ||
+  `${BACKEND_BASE_URL}/api`
 
 const parseResponse = async (response) => {
   const json = await response.json().catch(() => null)
