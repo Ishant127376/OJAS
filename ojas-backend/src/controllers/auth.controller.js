@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import User from '../models/user.model.js'
-import { assignPublicRole, normalizeEmail } from '../utils/role.utils.js'
+import { ROLE, assignPublicRole, normalizeEmail } from '../utils/role.utils.js'
 
 const createToken = (user) => {
   return jwt.sign(
@@ -44,11 +44,13 @@ export const register = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10)
+    const finalRole = assignPublicRole(normalizedEmail)
     const user = await User.create({
       name: name.trim(),
       email: normalizedEmail,
       password: hashedPassword,
-      role: assignPublicRole(normalizedEmail),
+      role: finalRole,
+      isRoleSelected: finalRole === ROLE.SUPER_ADMIN,
     })
 
     const token = createToken(user)
@@ -62,6 +64,7 @@ export const register = async (req, res) => {
           name: user.name,
           email: user.email,
           role: user.role,
+          isRoleSelected: user.isRoleSelected,
           createdBy: user.createdBy,
         },
       },
@@ -128,6 +131,11 @@ export const login = async (req, res) => {
       })
     }
 
+    if (user.role === ROLE.SUPER_ADMIN && !user.isRoleSelected) {
+      user.isRoleSelected = true
+      await user.save()
+    }
+
     const token = createToken(user)
 
     return res.status(200).json({
@@ -139,6 +147,7 @@ export const login = async (req, res) => {
           name: user.name,
           email: user.email,
           role: user.role,
+          isRoleSelected: user.isRoleSelected,
           createdBy: user.createdBy,
         },
       },
@@ -170,6 +179,7 @@ export const me = async (req, res) => {
       name: req.user.name,
       email: req.user.email,
       role: req.user.role,
+      isRoleSelected: req.user.isRoleSelected,
       createdBy: createdByUser,
     },
   })
@@ -185,6 +195,11 @@ export const googleAuthSuccess = async (req, res) => {
           message: 'Google authentication failed',
         },
       })
+    }
+
+    if (req.user.role === ROLE.SUPER_ADMIN && !req.user.isRoleSelected) {
+      req.user.isRoleSelected = true
+      await req.user.save()
     }
 
     const token = createToken(req.user)

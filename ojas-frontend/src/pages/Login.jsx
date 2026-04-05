@@ -54,8 +54,12 @@ export default function Login() {
     setError(null)
 
     try {
-      await login(form)
-      navigate('/')
+      const response = await login(form)
+      if (!response.user?.isRoleSelected) {
+        navigate('/select-role')
+      } else {
+        navigate('/')
+      }
     } catch (submitError) {
       setError(submitError.message)
     } finally {

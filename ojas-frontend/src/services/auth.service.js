@@ -51,8 +51,6 @@ export const loginUser = async ({ email, password }) => {
 }
 
 export const registerUser = async ({ name, email, password }) => {
-  console.log('[AuthService] Debug - API_BASE_URL:', API_BASE_URL)
-  console.log('[AuthService] Debug - Register URL:', `${API_BASE_URL}/auth/register`)
   const response = await fetch(`${API_BASE_URL}/auth/register`, {
     method: 'POST',
     headers: {
@@ -76,7 +74,6 @@ export const getMe = async (token) => {
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('ojas_token')
-  console.log('[AuthService] Token from localStorage:', token ? 'EXISTS' : 'MISSING')
   return {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),

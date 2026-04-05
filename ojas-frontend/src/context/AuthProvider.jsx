@@ -50,11 +50,8 @@ export function AuthProvider({ children }) {
   }
 
   const loginWithToken = async (incomingToken) => {
-    console.log('[AuthProvider] loginWithToken called with:', incomingToken ? 'TOKEN_PROVIDED' : 'NO_TOKEN')
     const me = await getMe(incomingToken)
-    console.log('[AuthProvider] getMe response:', me)
     localStorage.setItem(STORAGE_TOKEN_KEY, incomingToken)
-    console.log('[AuthProvider] Token saved to localStorage')
     setToken(incomingToken)
     setUser(me)
     return me

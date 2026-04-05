@@ -24,8 +24,12 @@ export default function Register() {
     setError(null)
 
     try {
-      await register(form)
-      navigate('/')
+      const response = await register(form)
+      if (!response.user?.isRoleSelected) {
+        navigate('/select-role')
+      } else {
+        navigate('/')
+      }
     } catch (submitError) {
       setError(submitError.message)
     } finally {
