@@ -9,19 +9,6 @@ const getInitialToken = () => {
     return null
   }
 
-  const params = new URLSearchParams(window.location.search)
-  const urlToken = params.get('token')
-
-  if (urlToken) {
-    localStorage.setItem(STORAGE_TOKEN_KEY, urlToken)
-    params.delete('token')
-    params.delete('needsRoleSelection')
-    const query = params.toString()
-    const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}`
-    window.history.replaceState({}, '', nextUrl)
-    return urlToken
-  }
-
   return localStorage.getItem(STORAGE_TOKEN_KEY)
 }
 

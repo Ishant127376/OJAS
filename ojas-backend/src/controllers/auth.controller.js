@@ -203,7 +203,7 @@ export const googleAuthSuccess = async (req, res) => {
       await req.user.save()
     }
 
-    const frontendUrl = process.env.FRONTEND_URL
+    const frontendUrl = process.env.FRONTEND_URL?.replace(/\/+$/, '')
     if (!frontendUrl) {
       return res.status(500).json({
         success: false,

@@ -60,7 +60,8 @@ function App() {
     params.delete('token')
     params.delete('needsRoleSelection')
     const query = params.toString()
-    const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}`
+    const pathname = (window.location.pathname || '/').replace(/\/+/g, '/')
+    const nextUrl = `${pathname}${query ? `?${query}` : ''}`
     window.history.replaceState({}, '', nextUrl)
 
     localStorage.setItem('token', token)
