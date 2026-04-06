@@ -43,9 +43,9 @@ const getAccessibleOwnerIds = async (authUser) => {
   }
 
   if (authUser.role === ROLE.SUB_ADMIN) {
-    const managedUsers = await User.find({ createdBy: authUser._id }, { _id: 1 }).lean()
+    const managedUsers = await User.find({ parentId: authUser._id }, { _id: 1 }).lean()
     const managedUserIds = managedUsers.map((item) => item._id)
-    return managedUserIds
+    return [authUser._id, ...managedUserIds]
   }
 
   return [authUser._id]
@@ -158,7 +158,7 @@ export const addDevice = async (req, res) => {
 export const getDevices = async (req, res) => {
   try {
     const ownerIds = await getAccessibleOwnerIds(req.user)
-    const filter = ownerIds ? { userId: { $in: ownerIds } } : {}
+    const filter = ownerIds ? { createdBy: { $in: ownerIds } } : {}
 
     const devices = await Device.find(filter, {
       deviceId: 1,
@@ -221,7 +221,7 @@ export const getDeviceById = async (req, res) => {
     const ownerIds = await getAccessibleOwnerIds(req.user)
     const filter = {
       deviceId: normalizedDeviceId,
-      ...(ownerIds ? { userId: { $in: ownerIds } } : {}),
+      ...(ownerIds ? { createdBy: { $in: ownerIds } } : {}),
     }
 
     const device = await Device.findOne(filter).lean()

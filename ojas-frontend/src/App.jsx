@@ -14,6 +14,7 @@ import NotFound from './pages/NotFound'
 import Register from './pages/Register'
 import SelectRole from './pages/SelectRole'
 import Settings from './pages/Settings'
+import RoleGuard from './components/common/RoleGuard'
 
 function ProtectedLayout() {
   return (
@@ -31,7 +32,6 @@ function ProtectedLayout() {
               <Route path="/dcb/:id" element={<DCBDetail />} />
               <Route path="/alerts" element={<Alerts />} />
               <Route path="/energy" element={<Energy />} />
-              <Route path="/settings" element={<Settings />} />
               <Route path="/home" element={<Navigate to="/" replace />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
@@ -95,6 +95,14 @@ function App() {
       <Route
         path="/select-role"
         element={isAuthenticated ? <SelectRole /> : <Navigate to="/login" replace />}
+      />
+      <Route
+        path="/settings"
+        element={
+          <RoleGuard allowedRoles={['SUPER_ADMIN', 'SUB_ADMIN']}>
+            <Settings />
+          </RoleGuard>
+        }
       />
       <Route
         path="/*"

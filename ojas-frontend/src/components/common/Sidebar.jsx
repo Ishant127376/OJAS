@@ -19,6 +19,9 @@ export default function Sidebar() {
     ? links.filter((link) => link.path === '/devices')
     : links
 
+  const canManageUsers = ['SUPER_ADMIN', 'SUB_ADMIN'].includes(user?.role)
+  const canAddDevice = ['SUPER_ADMIN', 'SUB_ADMIN', 'USER'].includes(user?.role)
+
   return (
     <div className="w-64 border-r border-border bg-surface/30 backdrop-blur-sm">
       <div className="flex h-full flex-col">
@@ -48,6 +51,28 @@ export default function Sidebar() {
               </Link>
             )
           })}
+
+          {(canManageUsers || canAddDevice) && (
+            <div className="mt-6 space-y-2">
+              <p className="px-4 text-xs font-semibold uppercase text-textSecondary">Quick Actions</p>
+              {canManageUsers && (
+                <Link
+                  to="/settings"
+                  className="group flex items-center gap-3 rounded-lg px-4 py-3 text-textSecondary hover:text-textPrimary hover:bg-border/20 transition-all"
+                >
+                  <span className="text-sm font-medium">Add User</span>
+                </Link>
+              )}
+              {canAddDevice && (
+                <Link
+                  to="/devices"
+                  className="group flex items-center gap-3 rounded-lg px-4 py-3 text-textSecondary hover:text-textPrimary hover:bg-border/20 transition-all"
+                >
+                  <span className="text-sm font-medium">Add Device</span>
+                </Link>
+              )}
+            </div>
+          )}
         </nav>
 
         {/* Settings */}

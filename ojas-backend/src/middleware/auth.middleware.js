@@ -17,7 +17,9 @@ export const verifyToken = async (req, res, next) => {
     }
 
     const payload = jwt.verify(token, process.env.JWT_SECRET)
-    const user = await User.findById(payload.userId).select('_id name email role createdBy').lean()
+    const user = await User.findById(payload.userId)
+      .select('_id name email role createdBy parentId')
+      .lean()
 
     if (!user) {
       return res.status(401).json({
@@ -67,5 +69,7 @@ export const requireRole = (roles = []) => {
     next()
   }
 }
+
+export const roleMiddleware = (allowedRoles = []) => requireRole(allowedRoles)
 
 export const authMiddleware = verifyToken

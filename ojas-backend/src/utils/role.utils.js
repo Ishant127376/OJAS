@@ -28,7 +28,7 @@ export const getRoleScopedUserFilter = async (user, UserModel) => {
   }
 
   if (user.role === ROLE.SUB_ADMIN) {
-    const managedUsers = await UserModel.find({ createdBy: user._id }, { _id: 1 }).lean()
+    const managedUsers = await UserModel.find({ parentId: user._id }, { _id: 1 }).lean()
     const managedIds = managedUsers.map((item) => item._id)
     return { _id: { $in: managedIds } }
   }

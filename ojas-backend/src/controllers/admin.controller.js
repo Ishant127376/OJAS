@@ -25,7 +25,9 @@ const createManagedUser = async ({ name, email, password, role, createdBy }) => 
     email: normalizedEmail,
     password: hashedPassword,
     role: finalRole,
+    isRoleSelected: true,
     createdBy,
+    parentId: createdBy,
   })
 
   return user
@@ -50,6 +52,7 @@ export const createSubAdmin = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        parentId: user.parentId,
         createdBy: user.createdBy,
       },
       message: 'Sub-admin created successfully',
@@ -85,6 +88,7 @@ export const createUserBySubAdmin = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        parentId: user.parentId,
         createdBy: user.createdBy,
       },
       message: 'User created successfully',
@@ -106,7 +110,7 @@ export const getUsersByRoleScope = async (req, res) => {
     let filter = {}
 
     if (req.user.role === ROLE.SUB_ADMIN) {
-      filter = { createdBy: req.user._id }
+      filter = { parentId: req.user._id }
     }
 
     if (req.user.role === ROLE.USER) {
@@ -114,7 +118,7 @@ export const getUsersByRoleScope = async (req, res) => {
     }
 
     const users = await User.find(filter)
-      .select('_id name email role createdBy createdAt')
+      .select('_id name email role parentId createdBy createdAt')
       .sort({ createdAt: -1 })
       .lean()
 

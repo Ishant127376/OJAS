@@ -38,6 +38,12 @@ const userSchema = new mongoose.Schema(
       ref: 'User',
       default: null,
     },
+    parentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true,
+    },
   },
   {
     timestamps: true,
