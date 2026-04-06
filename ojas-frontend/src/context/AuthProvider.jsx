@@ -2,10 +2,31 @@ import { useEffect, useMemo, useState } from 'react'
 import { AuthContext } from './AuthContext'
 import { getMe, loginUser, registerUser } from '../services/auth.service'
 
-const STORAGE_TOKEN_KEY = 'ojas_token'
+const STORAGE_TOKEN_KEY = 'token'
+
+const getInitialToken = () => {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  const params = new URLSearchParams(window.location.search)
+  const urlToken = params.get('token')
+
+  if (urlToken) {
+    localStorage.setItem(STORAGE_TOKEN_KEY, urlToken)
+    params.delete('token')
+    params.delete('needsRoleSelection')
+    const query = params.toString()
+    const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}`
+    window.history.replaceState({}, '', nextUrl)
+    return urlToken
+  }
+
+  return localStorage.getItem(STORAGE_TOKEN_KEY)
+}
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() => localStorage.getItem(STORAGE_TOKEN_KEY))
+  const [token, setToken] = useState(getInitialToken)
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -68,7 +89,7 @@ export function AuthProvider({ children }) {
       token,
       user,
       loading,
-      isAuthenticated: Boolean(token && user),
+      isAuthenticated: Boolean(token),
       login,
       register,
       loginWithToken,

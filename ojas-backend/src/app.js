@@ -13,11 +13,12 @@ import passport, { configurePassport } from './config/passport.js'
 
 const app = express()
 
-const corsOrigins = (
-  process.env.CORS_ORIGINS ||
-  process.env.FRONTEND_URL ||
-  'http://localhost:5173,http://localhost:3000'
-)
+const corsOriginValue = process.env.CORS_ORIGINS || process.env.FRONTEND_URL
+if (!corsOriginValue) {
+  throw new Error('CORS_ORIGINS or FRONTEND_URL must be configured')
+}
+
+const corsOrigins = corsOriginValue
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean)
@@ -90,7 +91,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`)
+  console.log(`🚀 Server running on port ${PORT}`)
 })
 
 export default app

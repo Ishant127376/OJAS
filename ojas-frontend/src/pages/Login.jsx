@@ -27,7 +27,7 @@ export default function Login() {
         if (!userData.isRoleSelected) {
           navigate('/select-role')
         } else {
-          navigate('/')
+          navigate('/dashboard')
         }
       } catch (oauthError) {
         setError(oauthError.message)
@@ -58,7 +58,7 @@ export default function Login() {
       if (!response.user?.isRoleSelected) {
         navigate('/select-role')
       } else {
-        navigate('/')
+        navigate('/dashboard')
       }
     } catch (submitError) {
       setError(submitError.message)

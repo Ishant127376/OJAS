@@ -26,13 +26,7 @@ router.get('/google', (req, res, next) => {
 
 router.get(
 	'/google/callback',
-	(req, res, next) => {
-		const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
-		return passport.authenticate('google', {
-			session: false,
-			failureRedirect: `${frontendUrl}/login?error=google_auth_failed`,
-		})(req, res, next)
-	},
+	passport.authenticate('google', { session: false }),
 	googleAuthSuccess
 )
 

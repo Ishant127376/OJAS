@@ -1,27 +1,12 @@
 import { MOCK_ALERTS } from '../utils/constants'
 
-const DEFAULT_PROD_BACKEND_BASE_URL = 'https://ojas-r00n.onrender.com'
-const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1'])
-const currentHost = typeof window !== 'undefined' ? window.location.hostname : ''
-const isLocalhost = LOCAL_HOSTS.has(currentHost)
-
-const normalizeUrl = (value) => (value ? value.replace(/\/+$/, '') : value)
-const isLocalUrl = (value) => /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(value || '')
-
-const envApiBaseUrl = normalizeUrl(import.meta.env.VITE_API_BASE_URL)
-const envBackendBaseUrl = normalizeUrl(import.meta.env.VITE_BACKEND_BASE_URL)
-const safeEnvApiBaseUrl = !isLocalhost && isLocalUrl(envApiBaseUrl) ? null : envApiBaseUrl
-const safeEnvBackendBaseUrl = !isLocalhost && isLocalUrl(envBackendBaseUrl) ? null : envBackendBaseUrl
-
-const backendBaseUrl =
-  safeEnvBackendBaseUrl ||
-  (safeEnvApiBaseUrl ? safeEnvApiBaseUrl.replace(/\/api$/i, '') : null) ||
-  (isLocalhost ? 'http://localhost:5001' : DEFAULT_PROD_BACKEND_BASE_URL)
-
-const API_BASE_URL = safeEnvApiBaseUrl || `${backendBaseUrl}/api`
+const API_BASE_URL = import.meta.env.VITE_API_URL
+if (!API_BASE_URL) {
+  throw new Error('VITE_API_URL is required')
+}
 
 const getAuthHeaders = () => {
-  const token = localStorage.getItem('ojas_token')
+  const token = localStorage.getItem('token')
 
   return {
     'Content-Type': 'application/json',

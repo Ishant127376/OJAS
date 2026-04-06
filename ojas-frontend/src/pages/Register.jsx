@@ -28,7 +28,7 @@ export default function Register() {
       if (!response.user?.isRoleSelected) {
         navigate('/select-role')
       } else {
-        navigate('/')
+        navigate('/dashboard')
       }
     } catch (submitError) {
       setError(submitError.message)

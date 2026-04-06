@@ -7,6 +7,7 @@ const createToken = (user) => {
   return jwt.sign(
     {
       userId: user._id.toString(),
+      id: user._id.toString(),
       email: user.email,
       role: user.role,
       isRoleSelected: user.isRoleSelected,
@@ -202,14 +203,26 @@ export const googleAuthSuccess = async (req, res) => {
       await req.user.save()
     }
 
-    const token = createToken(req.user)
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
-    const needsRoleSelection = !req.user.isRoleSelected
-    
-    let redirectUrl = `${frontendUrl}/login?token=${encodeURIComponent(token)}`
-    if (needsRoleSelection) {
-      redirectUrl += `&needsRoleSelection=true`
+    const frontendUrl = process.env.FRONTEND_URL
+    if (!frontendUrl) {
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: 'CONFIG_ERROR',
+          message: 'FRONTEND_URL is not configured',
+        },
+      })
     }
+
+    const token = createToken(req.user)
+    const needsRoleSelection = !req.user.isRoleSelected
+    const redirectUrl = `${frontendUrl}/dashboard?token=${encodeURIComponent(token)}${
+      needsRoleSelection ? '&needsRoleSelection=true' : ''
+    }`
+
+    console.log('User:', req.user)
+    console.log('Generated Token:', token)
+    console.log('Redirecting to:', redirectUrl)
 
     return res.redirect(redirectUrl)
   } catch (error) {
