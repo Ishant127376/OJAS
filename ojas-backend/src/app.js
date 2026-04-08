@@ -58,6 +58,13 @@ app.get('/', (req, res) => {
   })
 })
 
+app.get('/health/mqtt', (req, res) => {
+  const mqttClient = getMqttClient()
+  res.status(200).json({
+    connected: Boolean(mqttClient?.connected),
+  })
+})
+
 // Routes
 app.use('/api/auth', authRoutes)
 app.use('/auth', authRoutes)

@@ -39,17 +39,32 @@ const handleStatusMessage = async (topic, payload) => {
   let statusPayload = null
   try {
     statusPayload = JSON.parse(rawMessage)
-  } catch {
+  } catch (error) {
+    console.warn('Invalid status payload JSON. Falling back to raw status.', {
+      deviceId,
+      rawMessage,
+    })
     statusPayload = { status: rawMessage }
   }
 
   const status = statusPayload?.status === 'online' ? 'online' : 'offline'
   const timestamp = statusPayload?.timestamp ? new Date(statusPayload.timestamp) : new Date()
+  const lastSeen = isNaN(timestamp.getTime()) ? new Date() : timestamp
 
-  await Device.updateOne(
+  console.log('MQTT status update received', {
+    deviceId,
+    status,
+    timestamp: lastSeen.toISOString(),
+  })
+
+  const result = await Device.updateOne(
     { deviceId },
-    { status, lastSeen: isNaN(timestamp.getTime()) ? new Date() : timestamp }
+    { status, lastSeen }
   )
+
+  if (!result.matchedCount) {
+    console.warn('Status update received for unknown device', { deviceId })
+  }
 }
 
 const createClient = () => {
@@ -79,6 +94,10 @@ const createClient = () => {
 
   client.on('error', (error) => {
     console.error('MQTT backend client error:', error.message)
+  })
+
+  client.on('close', () => {
+    console.warn('MQTT backend client connection closed')
   })
 
   client.on('reconnect', () => {

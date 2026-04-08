@@ -22,7 +22,7 @@ const createUniqueDeviceId = async (deviceType) => {
 }
 
 const generateRandomPassword = () => {
-  return crypto.randomBytes(18).toString('base64url')
+  return crypto.randomBytes(32).toString('hex')
 }
 
 const normalizeSubDevices = (subDevices) => {
@@ -226,7 +226,10 @@ export const getDeviceById = async (req, res) => {
       ...(ownerIds ? { createdBy: { $in: ownerIds } } : {}),
     }
 
-    const device = await Device.findOne(filter).lean()
+    const device = await Device.findOne(filter, {
+      mqttUsername: 0,
+      mqttPassword: 0,
+    }).lean()
 
     if (!device) {
       return res.status(404).json({
