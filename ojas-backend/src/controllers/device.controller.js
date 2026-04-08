@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import Device from '../models/device.model.js'
 import Telemetry from '../models/telemetry.model.js'
 import User from '../models/user.model.js'
@@ -21,7 +22,7 @@ const createUniqueDeviceId = async (deviceType) => {
 }
 
 const generateRandomPassword = () => {
-  return Math.random().toString(36).slice(2, 14)
+  return crypto.randomBytes(18).toString('base64url')
 }
 
 const normalizeSubDevices = (subDevices) => {
@@ -107,6 +108,8 @@ export const addDevice = async (req, res) => {
       topic,
       userId: req.user._id,
       createdBy: req.user._id,
+      status: 'offline',
+      lastSeen: null,
     })
 
     await newDevice.save()
@@ -126,6 +129,8 @@ export const addDevice = async (req, res) => {
         topic: newDevice.topic,
         userId: newDevice.userId,
         createdBy: newDevice.createdBy,
+        status: newDevice.status,
+        lastSeen: newDevice.lastSeen,
         createdAt: newDevice.createdAt,
         updatedAt: newDevice.updatedAt,
       },
@@ -168,11 +173,11 @@ export const getDevices = async (req, res) => {
       tag: 1,
       description: 1,
       subDevices: 1,
-      mqttUsername: 1,
-      mqttPassword: 1,
       topic: 1,
       userId: 1,
       createdBy: 1,
+      status: 1,
+      lastSeen: 1,
       createdAt: 1,
       updatedAt: 1,
     }).lean()
@@ -183,13 +188,10 @@ export const getDevices = async (req, res) => {
           .sort({ timestamp: -1 })
           .lean()
 
-        const lastUpdatedAt = latestTelemetry?.timestamp || null
-        const isOnline = lastUpdatedAt ? Date.now() - new Date(lastUpdatedAt).getTime() <= 10000 : false
-
         return {
           ...device,
-          status: isOnline ? 'online' : 'offline',
-          lastUpdatedAt,
+          status: device.status || 'offline',
+          lastSeen: device.lastSeen || null,
           lastTelemetry: latestTelemetry || null,
         }
       })
@@ -240,15 +242,12 @@ export const getDeviceById = async (req, res) => {
       .sort({ timestamp: -1 })
       .lean()
 
-    const lastUpdatedAt = latestTelemetry?.timestamp || null
-    const isOnline = lastUpdatedAt ? Date.now() - new Date(lastUpdatedAt).getTime() <= 10000 : false
-
     return res.status(200).json({
       success: true,
       data: {
         ...device,
-        status: isOnline ? 'online' : 'offline',
-        lastUpdatedAt,
+        status: device.status || 'offline',
+        lastSeen: device.lastSeen || null,
         lastTelemetry: latestTelemetry || null,
       },
     })

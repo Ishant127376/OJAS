@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { formatTimestamp } from '../../utils/formatters'
+import { formatRelativeTime } from '../../utils/formatters'
 
 export default function DeviceCard({ device }) {
   const navigate = useNavigate()
@@ -33,7 +33,7 @@ export default function DeviceCard({ device }) {
           {device.location && <p className="text-xs text-textSecondary mb-1">Location: {device.location}</p>}
           {device.tag && <p className="text-xs text-textSecondary mb-1">Tag: {device.tag}</p>}
           <p className="text-xs text-textSecondary">
-            {device.lastUpdatedAt ? `Last Updated: ${formatTimestamp(device.lastUpdatedAt)}` : 'No telemetry yet'}
+            {device.lastSeen ? `Last Seen: ${formatRelativeTime(device.lastSeen)}` : 'No status yet'}
           </p>
         </div>
 

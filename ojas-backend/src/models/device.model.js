@@ -62,12 +62,12 @@ const deviceSchema = new mongoose.Schema(
     },
     mqttUsername: {
       type: String,
-      required: true,
       unique: true,
+      sparse: true,
     },
     mqttPassword: {
       type: String,
-      required: true,
+      default: null,
     },
     topic: {
       type: String,
@@ -84,6 +84,16 @@ const deviceSchema = new mongoose.Schema(
       ref: 'User',
       default: null,
       index: true,
+    },
+    status: {
+      type: String,
+      enum: ['online', 'offline'],
+      default: 'offline',
+      index: true,
+    },
+    lastSeen: {
+      type: Date,
+      default: null,
     },
   },
   {

@@ -1,4 +1,7 @@
+import fs from 'fs'
+import path from 'path'
 import mqtt from 'mqtt'
+import Device from '../models/device.model.js'
 
 const MQTT_URL = process.env.MQTT_URL
 const MQTT_USERNAME = process.env.MQTT_USERNAME
@@ -6,17 +9,72 @@ const MQTT_PASSWORD = process.env.MQTT_PASSWORD
 
 let mqttClient = null
 
+const STATUS_TOPIC = 'device/+/status'
+
+const loadCaCertificate = () => {
+  const caPath = process.env.MQTT_CA_CERT_PATH || 'ca.crt'
+  const resolvedPath = path.resolve(process.cwd(), caPath)
+
+  if (!fs.existsSync(resolvedPath)) {
+    return null
+  }
+
+  try {
+    return fs.readFileSync(resolvedPath)
+  } catch (error) {
+    console.warn('Failed to read MQTT CA certificate:', error.message)
+    return null
+  }
+}
+
+const handleStatusMessage = async (topic, payload) => {
+  const match = topic.match(/^device\/([^/]+)\/status$/)
+  if (!match) {
+    return
+  }
+
+  const deviceId = match[1]
+  const rawMessage = payload?.toString?.() || ''
+
+  let statusPayload = null
+  try {
+    statusPayload = JSON.parse(rawMessage)
+  } catch {
+    statusPayload = { status: rawMessage }
+  }
+
+  const status = statusPayload?.status === 'online' ? 'online' : 'offline'
+  const timestamp = statusPayload?.timestamp ? new Date(statusPayload.timestamp) : new Date()
+
+  await Device.updateOne(
+    { deviceId },
+    { status, lastSeen: isNaN(timestamp.getTime()) ? new Date() : timestamp }
+  )
+}
+
 const createClient = () => {
+  const caCertificate = loadCaCertificate()
   const client = mqtt.connect(MQTT_URL, {
     username: MQTT_USERNAME,
     password: MQTT_PASSWORD,
     reconnectPeriod: 5000,
     connectTimeout: 20000,
     clean: true,
+    ...(caCertificate
+      ? {
+          ca: caCertificate,
+          rejectUnauthorized: true,
+        }
+      : {}),
   })
 
   client.on('connect', () => {
     console.log('MQTT backend client connected')
+    client.subscribe(STATUS_TOPIC, (error) => {
+      if (error) {
+        console.error('Failed to subscribe to status topic:', error.message)
+      }
+    })
   })
 
   client.on('error', (error) => {
@@ -25,6 +83,14 @@ const createClient = () => {
 
   client.on('reconnect', () => {
     console.log('MQTT backend client reconnecting...')
+  })
+
+  client.on('message', (topic, payload) => {
+    if (topic.startsWith('device/') && topic.endsWith('/status')) {
+      handleStatusMessage(topic, payload).catch((error) => {
+        console.error('Failed to process status message:', error.message)
+      })
+    }
   })
 
   return client
