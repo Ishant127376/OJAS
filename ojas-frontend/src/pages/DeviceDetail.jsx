@@ -41,35 +41,45 @@ export default function DeviceDetailPage() {
 
   // MQTT connection — stable, never recreated unless deviceId changes
   useEffect(() => {
-    const client = mqtt.connect(import.meta.env.VITE_MQTT_WS_URL, {
+    const client = mqtt.connect(import.meta.env.VITE_MQTT_BROKER_URL, {
       username: import.meta.env.VITE_MQTT_USERNAME,
       password: import.meta.env.VITE_MQTT_PASSWORD,
-      rejectUnauthorized: false,
       reconnectPeriod: 5000,
-      connectTimeout: 10000,
+      connectTimeout: 20000,
+      clean: true,
     })
 
     client.on('connect', () => {
-      console.log('MQTT connected')
-      client.subscribe(`device/${deviceId}/telemetry`, (err) => {
-        if (err) console.error('Subscribe error:', err)
-        else console.log('Subscribed to:', `device/${deviceId}/telemetry`)
+      console.log('✅ MQTT connected')
+
+      const topic = `device/${deviceId}/telemetry`
+      client.subscribe(topic, (err) => {
+        if (err) {
+          console.error('❌ Subscription error:', err)
+        } else {
+          console.log('✅ Subscribed to:', topic)
+        }
       })
     })
 
     client.on('message', (topic, message) => {
-      console.log('MQTT message received:', topic, message.toString())
+      console.log('🔥 MQTT message received:', topic, message.toString())
+
       try {
-        const data = JSON.parse(message.toString())
-        setTelemetry(data)
+        const parsed = JSON.parse(message.toString())
+        setTelemetry((prev) => ({
+          ...prev,
+          ...parsed,
+        }))
         setLastSeen(Date.now())
       } catch (e) {
-        console.error('Failed to parse MQTT message:', e)
+        console.error('❌ Failed to parse MQTT message:', e)
       }
     })
 
-    client.on('error', (err) => console.error('MQTT error:', err))
-    client.on('disconnect', () => console.log('MQTT disconnected'))
+    client.on('error', (err) => {
+      console.error('❌ MQTT error:', err)
+    })
 
     return () => {
       client.end(true)

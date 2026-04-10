@@ -4,7 +4,7 @@ let client = null
 let activeTopic = null
 
 // MQTT Broker WebSocket URL
-const BROKER_URL = import.meta.env.VITE_MQTT_WS_URL 
+const BROKER_URL = import.meta.env.VITE_MQTT_BROKER_URL
 
 const MQTT_USERNAME = import.meta.env.VITE_MQTT_USERNAME
 const MQTT_PASSWORD = import.meta.env.VITE_MQTT_PASSWORD
