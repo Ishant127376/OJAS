@@ -44,8 +44,9 @@ export default function DeviceDetailPage() {
     const client = mqtt.connect(import.meta.env.VITE_MQTT_WS_URL, {
       username: import.meta.env.VITE_MQTT_USERNAME,
       password: import.meta.env.VITE_MQTT_PASSWORD,
-      protocol: 'mqtts',
       rejectUnauthorized: false,
+      reconnectPeriod: 5000,
+      connectTimeout: 10000,
     })
 
     client.on('connect', () => {
