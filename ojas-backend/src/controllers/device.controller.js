@@ -25,6 +25,32 @@ const generateRandomPassword = () => {
   return crypto.randomBytes(32).toString('hex')
 }
 
+const OFFLINE_THRESHOLD_MS = Number(process.env.DEVICE_STATUS_OFFLINE_MS ?? 120000)
+
+const shouldFallbackOffline = (device, lastActivity) => {
+  if (!lastActivity) {
+    return false
+  }
+
+  const lastSeenMs = new Date(lastActivity).getTime()
+  if (Number.isNaN(lastSeenMs)) {
+    return false
+  }
+
+  const threshold = Number.isFinite(OFFLINE_THRESHOLD_MS) ? OFFLINE_THRESHOLD_MS : 120000
+  const isStale = Date.now() - lastSeenMs > threshold
+  if (!isStale) {
+    return false
+  }
+
+  const lastOfflineMs = device.lastSeenOffline
+    ? new Date(device.lastSeenOffline).getTime()
+    : null
+
+  const offlineMessageReceived = Number.isFinite(lastOfflineMs) && lastOfflineMs >= lastSeenMs
+  return !offlineMessageReceived
+}
+
 const normalizeSubDevices = (subDevices) => {
   if (!Array.isArray(subDevices)) {
     return []
@@ -110,6 +136,7 @@ export const addDevice = async (req, res) => {
       createdBy: req.user._id,
       status: 'offline',
       lastSeen: null,
+      lastSeenOffline: null,
     })
 
     await newDevice.save()
@@ -131,6 +158,7 @@ export const addDevice = async (req, res) => {
         createdBy: newDevice.createdBy,
         status: newDevice.status,
         lastSeen: newDevice.lastSeen,
+        lastSeenOffline: newDevice.lastSeenOffline,
         createdAt: newDevice.createdAt,
         updatedAt: newDevice.updatedAt,
       },
@@ -178,6 +206,7 @@ export const getDevices = async (req, res) => {
       createdBy: 1,
       status: 1,
       lastSeen: 1,
+      lastSeenOffline: 1,
       createdAt: 1,
       updatedAt: 1,
     }).lean()
@@ -188,10 +217,18 @@ export const getDevices = async (req, res) => {
           .sort({ timestamp: -1 })
           .lean()
 
+        const lastActivity = device.lastSeen || latestTelemetry?.timestamp || null
+        const fallbackOffline = shouldFallbackOffline(device, lastActivity)
+        const resolvedStatus = fallbackOffline ? 'offline' : (device.status || 'offline')
+        const resolvedLastSeenOffline = fallbackOffline
+          ? new Date()
+          : (device.lastSeenOffline || null)
+
         return {
           ...device,
-          status: device.status || 'offline',
-          lastSeen: device.lastSeen || null,
+          status: resolvedStatus,
+          lastSeen: lastActivity,
+          lastSeenOffline: resolvedLastSeenOffline,
           lastTelemetry: latestTelemetry || null,
         }
       })
@@ -245,12 +282,20 @@ export const getDeviceById = async (req, res) => {
       .sort({ timestamp: -1 })
       .lean()
 
+    const lastActivity = device.lastSeen || latestTelemetry?.timestamp || null
+    const fallbackOffline = shouldFallbackOffline(device, lastActivity)
+    const resolvedStatus = fallbackOffline ? 'offline' : (device.status || 'offline')
+    const resolvedLastSeenOffline = fallbackOffline
+      ? new Date()
+      : (device.lastSeenOffline || null)
+
     return res.status(200).json({
       success: true,
       data: {
         ...device,
-        status: device.status || 'offline',
-        lastSeen: device.lastSeen || null,
+        status: resolvedStatus,
+        lastSeen: lastActivity,
+        lastSeenOffline: resolvedLastSeenOffline,
         lastTelemetry: latestTelemetry || null,
       },
     })

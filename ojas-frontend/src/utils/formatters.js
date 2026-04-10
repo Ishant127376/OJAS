@@ -1,7 +1,4 @@
-import dayjs from 'dayjs'
-import relativeTime from 'dayjs/plugin/relativeTime'
-
-dayjs.extend(relativeTime)
+import { timeAgo } from './timeAgo'
 
 const safeNumber = (value) => {
   if (value === undefined || value === null || isNaN(value)) {
@@ -65,8 +62,7 @@ export const formatCost = (kwh, rate) => {
 }
 
 export const formatTimestamp = (ts) => {
-  if (!ts) return 'Never'
-  return dayjs(ts).fromNow()
+  return timeAgo(ts)
 }
 
 export const formatRelativeTime = formatTimestamp

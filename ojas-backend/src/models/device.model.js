@@ -95,6 +95,10 @@ const deviceSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    lastSeenOffline: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,

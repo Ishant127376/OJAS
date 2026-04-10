@@ -41,9 +41,9 @@ const client = mqtt.connect(MQTT_URL, {
   connectTimeout: 20000,
   will: {
     topic: STATUS_TOPIC,
-    payload: JSON.stringify({ status: 'offline', timestamp: new Date().toISOString() }),
+    payload: JSON.stringify({ status: 'offline', timestamp: Date.now() }),
     qos: 1,
-    retain: false,
+    retain: true,
   },
 })
 
@@ -52,8 +52,8 @@ client.on('connect', async () => {
 
   client.publish(
     STATUS_TOPIC,
-    JSON.stringify({ status: 'online', timestamp: new Date().toISOString() }),
-    { qos: 1 },
+    JSON.stringify({ status: 'online', timestamp: Date.now() }),
+    { qos: 1, retain: true },
     async (error) => {
       if (error) {
         console.error('Failed to publish online status:', error.message)

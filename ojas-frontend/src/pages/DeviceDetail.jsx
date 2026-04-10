@@ -1,11 +1,12 @@
 import { ArrowLeft } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getDeviceById, getTelemetryHistory } from '../services/device.service'
 import { connectMQTT, disconnect } from '../services/mqtt.service'
 import Loader from '../components/common/Loader'
 import EnergyMeter from '../components/sensors/EnergyMeter'
 import LiveChart from '../components/charts/LiveChart'
+import { timeAgo } from '../utils/timeAgo'
 
 export default function DeviceDetail() {
   const { id } = useParams()
@@ -16,9 +17,18 @@ export default function DeviceDetail() {
   const [liveReadings, setLiveReadings] = useState(null)
   const [mqttConnected, setMqttConnected] = useState(false)
   const [chartData, setChartData] = useState([])
-  const [lastUpdatedSeconds, setLastUpdatedSeconds] = useState(null)
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(null)
+  const [timeTick, setTimeTick] = useState(0)
   const lastMessageTimeRef = useRef(null)
   const monitorIntervalRef = useRef(null)
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setTimeTick((prev) => prev + 1)
+    }, 30000)
+
+    return () => clearInterval(intervalId)
+  }, [])
 
   useEffect(() => {
     const loadDevice = async () => {
@@ -40,7 +50,7 @@ export default function DeviceDetail() {
         if (latest) {
           setLiveReadings(latest)
           lastMessageTimeRef.current = new Date(latest.timestamp).getTime()
-          setLastUpdatedSeconds(Math.floor((Date.now() - lastMessageTimeRef.current) / 1000))
+          setLastUpdatedAt(new Date(latest.timestamp))
 
           const historyChartData = [...history]
             .reverse()
@@ -59,7 +69,7 @@ export default function DeviceDetail() {
             setLiveReadings(data)
             lastMessageTimeRef.current = Date.now()
             setMqttConnected(true)
-            setLastUpdatedSeconds(0)
+            setLastUpdatedAt(new Date())
 
             setChartData((prev) => [
               ...prev.slice(-9),
@@ -81,13 +91,10 @@ export default function DeviceDetail() {
 
             if (!lastMessageTime) {
               setMqttConnected(false)
-              setLastUpdatedSeconds(null)
               return
             }
 
             const diff = Date.now() - lastMessageTime
-            const secondsAgo = Math.floor(diff / 1000)
-            setLastUpdatedSeconds(secondsAgo)
 
             if (diff > 10000) {
               setMqttConnected(false)
@@ -139,6 +146,14 @@ export default function DeviceDetail() {
     temperature: 0,
   }
 
+  const lastUpdatedLabel = useMemo(() => {
+    if (!lastUpdatedAt) {
+      return 'Waiting for data...'
+    }
+
+    return `Last updated: ${timeAgo(lastUpdatedAt)}`
+  }, [lastUpdatedAt, timeTick])
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -166,9 +181,7 @@ export default function DeviceDetail() {
                 {mqttConnected ? 'Live' : 'Offline'}
               </div>
               <p className="mt-2 text-sm text-textSecondary">
-                {lastUpdatedSeconds === null
-                  ? 'Waiting for data...'
-                  : `Last updated: ${lastUpdatedSeconds}s ago`}
+                {lastUpdatedLabel}
               </p>
             </div>
           </div>

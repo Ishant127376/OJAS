@@ -49,18 +49,19 @@ const handleStatusMessage = async (topic, payload) => {
 
   const status = statusPayload?.status === 'online' ? 'online' : 'offline'
   const timestamp = statusPayload?.timestamp ? new Date(statusPayload.timestamp) : new Date()
-  const lastSeen = isNaN(timestamp.getTime()) ? new Date() : timestamp
+  const safeTimestamp = isNaN(timestamp.getTime()) ? new Date() : timestamp
 
   console.log('MQTT status update received', {
     deviceId,
     status,
-    timestamp: lastSeen.toISOString(),
+    timestamp: safeTimestamp.toISOString(),
   })
 
-  const result = await Device.updateOne(
-    { deviceId },
-    { status, lastSeen }
-  )
+  const update = status === 'online'
+    ? { status, lastSeen: safeTimestamp, lastSeenOffline: null }
+    : { status, lastSeenOffline: safeTimestamp }
+
+  const result = await Device.updateOne({ deviceId }, update)
 
   if (!result.matchedCount) {
     console.warn('Status update received for unknown device', { deviceId })

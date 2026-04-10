@@ -1,8 +1,17 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import DeviceCard from './DeviceCard'
 
 export default function DeviceList({ devices = [] }) {
   const [filter, setFilter] = useState('all')
+  const [timeTick, setTimeTick] = useState(0)
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setTimeTick((prev) => prev + 1)
+    }, 30000)
+
+    return () => clearInterval(intervalId)
+  }, [])
 
   const filtered = useMemo(() => {
     return devices.filter((d) => {
@@ -37,7 +46,7 @@ export default function DeviceList({ devices = [] }) {
 
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
         {filtered.map((device) => (
-          <DeviceCard key={device.deviceId} device={device} />
+          <DeviceCard key={device.deviceId} device={device} timeTick={timeTick} />
         ))}
       </div>
 
