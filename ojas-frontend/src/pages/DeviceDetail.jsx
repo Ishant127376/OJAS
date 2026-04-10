@@ -1,7 +1,7 @@
 import { ArrowLeft } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getDeviceById, getTelemetryHistory } from '../services/device.service'
+import { getDeviceById } from '../services/device.service'
 import { connectMQTT, disconnect } from '../services/mqtt.service'
 import Loader from '../components/common/Loader'
 import EnergyMeter from '../components/sensors/EnergyMeter'
@@ -18,16 +18,13 @@ export default function DeviceDetail() {
   const [mqttConnected, setMqttConnected] = useState(false)
   const [chartData, setChartData] = useState([])
   const [lastUpdatedAt, setLastUpdatedAt] = useState(null)
-  const [timeTick, setTimeTick] = useState(0)
+  const [, forceUpdate] = useState(0)
   const lastMessageTimeRef = useRef(null)
   const monitorIntervalRef = useRef(null)
 
   useEffect(() => {
-    const intervalId = setInterval(() => {
-      setTimeTick((prev) => prev + 1)
-    }, 30000)
-
-    return () => clearInterval(intervalId)
+    const id = setInterval(() => forceUpdate((n) => n + 1), 30000)
+    return () => clearInterval(id)
   }, [])
 
   useEffect(() => {
@@ -43,26 +40,6 @@ export default function DeviceDetail() {
 
         setDevice(deviceData)
         const deviceId = deviceData.deviceId
-
-        const history = await getTelemetryHistory(deviceId)
-        const latest = history[0] || null
-
-        if (latest) {
-          setLiveReadings(latest)
-          lastMessageTimeRef.current = new Date(latest.timestamp).getTime()
-          setLastUpdatedAt(new Date(latest.timestamp))
-
-          const historyChartData = [...history]
-            .reverse()
-            .map((item) => ({
-              time: new Date(item.timestamp).toLocaleTimeString(),
-              power: item.power || 0,
-              voltage: item.voltage || 0,
-              current: item.current || 0,
-            }))
-
-          setChartData(historyChartData)
-        }
 
         try {
           await connectMQTT(deviceId, (data) => {
@@ -146,13 +123,9 @@ export default function DeviceDetail() {
     temperature: 0,
   }
 
-  const lastUpdatedLabel = useMemo(() => {
-    if (!lastUpdatedAt) {
-      return 'Waiting for data...'
-    }
-
-    return `Last updated: ${timeAgo(lastUpdatedAt)}`
-  }, [lastUpdatedAt, timeTick])
+  const lastUpdatedLabel = lastUpdatedAt
+    ? `Last updated: ${timeAgo(lastUpdatedAt)}`
+    : 'Waiting for data...'
 
   return (
     <div className="space-y-6">

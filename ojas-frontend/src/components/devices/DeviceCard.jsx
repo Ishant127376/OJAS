@@ -1,16 +1,11 @@
-import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { timeAgo } from '../../utils/timeAgo'
 
-export default function DeviceCard({ device, timeTick }) {
+export default function DeviceCard({ device }) {
   const navigate = useNavigate()
-  const lastSeenLabel = useMemo(() => {
-    if (!device.lastSeen) {
-      return 'No status yet'
-    }
-
-    return `Last Seen: ${timeAgo(device.lastSeen)}`
-  }, [device.lastSeen, timeTick])
+  const lastSeenLabel = device.lastSeen
+    ? `Last Seen: ${timeAgo(device.lastSeen)}`
+    : 'No status yet'
 
   const deviceType = device.deviceType || 'END'
   const isOnline = device.status === 'online'
