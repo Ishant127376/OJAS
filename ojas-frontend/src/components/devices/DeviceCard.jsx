@@ -1,16 +1,16 @@
 import { useNavigate } from 'react-router-dom'
 import { timeAgo } from '../../utils/timeAgo'
 
-export default function DeviceCard({ device, mqttConnected }) {
+export default function DeviceCard({ device, cardStatus }) {
   const navigate = useNavigate()
   const lastSeenLabel = device.lastSeen
     ? `Last Seen: ${timeAgo(device.lastSeen)}`
     : 'No status yet'
 
   const deviceType = device.deviceType || 'END'
-  const isOnline = typeof mqttConnected === 'boolean'
-    ? mqttConnected
-    : device.status === 'online'
+  const statusVariant = cardStatus?.variant || (device.status === 'online' ? 'online' : 'offline')
+  const statusLabel = cardStatus?.label || (device.status === 'online' ? 'Online' : 'Offline')
+  const isPositiveStatus = statusVariant === 'live' || statusVariant === 'online'
 
   const handleClick = () => {
     if (deviceType === 'DCB') {
@@ -29,7 +29,7 @@ export default function DeviceCard({ device, mqttConnected }) {
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
-            <div className="h-3 w-3 rounded-full bg-success animate-pulse"></div>
+            <div className={`h-3 w-3 rounded-full ${isPositiveStatus ? 'bg-success animate-pulse' : 'bg-danger'}`}></div>
             <span className="text-xs font-medium text-primary uppercase">{deviceType}</span>
           </div>
 
@@ -44,9 +44,9 @@ export default function DeviceCard({ device, mqttConnected }) {
 
         <div className="text-right">
           <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-            isOnline ? 'bg-success/20 text-success' : 'bg-danger/20 text-danger'
+            isPositiveStatus ? 'bg-success/20 text-success' : 'bg-danger/20 text-danger'
           }`}>
-            {isOnline ? 'Online' : 'Offline'}
+            {statusLabel}
           </span>
         </div>
       </div>

@@ -4,11 +4,17 @@ import DeviceCard from './DeviceCard'
 
 export default function DeviceList({ devices = [] }) {
   const [filter, setFilter] = useState('all')
-  const [mqttConnected, setMqttConnected] = useState(false)
+  const [recentTelemetryByDevice, setRecentTelemetryByDevice] = useState({})
+  const [liveTick, setLiveTick] = useState(0)
   const [, forceUpdate] = useState(0)
 
   useEffect(() => {
     const id = setInterval(() => forceUpdate((n) => n + 1), 30000)
+    return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    const id = setInterval(() => setLiveTick((n) => n + 1), 5000)
     return () => clearInterval(id)
   }, [])
 
@@ -22,13 +28,28 @@ export default function DeviceList({ devices = [] }) {
       connectTimeout: 20000,
     })
 
-    client.on('connect', () => setMqttConnected(true))
-    client.on('error', () => setMqttConnected(false))
-    client.on('offline', () => setMqttConnected(false))
-    client.on('close', () => setMqttConnected(false))
+    client.on('connect', () => {
+      client.subscribe('device/+/telemetry', (err) => {
+        if (err) {
+          console.error('Wildcard subscribe failed:', err)
+        }
+      })
+    })
+
+    client.on('message', (topic) => {
+      const match = topic.match(/^device\/([^/]+)\/telemetry$/)
+      if (!match) {
+        return
+      }
+
+      const topicDeviceId = match[1]
+      setRecentTelemetryByDevice((prev) => ({
+        ...prev,
+        [topicDeviceId]: Date.now(),
+      }))
+    })
 
     return () => {
-      setMqttConnected(false)
       client.end(true)
     }
   }, [])
@@ -39,6 +60,22 @@ export default function DeviceList({ devices = [] }) {
       return d.deviceType === filter
     })
   }, [devices, filter])
+
+  const getCardStatus = (device) => {
+    const LIVE_WINDOW_MS = 30000
+    const recentAt = recentTelemetryByDevice[device.deviceId]
+    const isLive = recentAt ? Date.now() - recentAt <= LIVE_WINDOW_MS : false
+
+    if (isLive) {
+      return { label: 'Live', variant: 'live' }
+    }
+
+    const backendOnline = device.status === 'online'
+    return {
+      label: backendOnline ? 'Online' : 'Offline',
+      variant: backendOnline ? 'online' : 'offline',
+    }
+  }
 
   return (
     <div>
@@ -66,7 +103,7 @@ export default function DeviceList({ devices = [] }) {
 
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
         {filtered.map((device) => (
-          <DeviceCard key={device.deviceId} device={device} mqttConnected={mqttConnected} />
+          <DeviceCard key={device.deviceId} device={device} cardStatus={getCardStatus(device)} />
         ))}
       </div>
 
