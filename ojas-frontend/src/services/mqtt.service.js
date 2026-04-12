@@ -69,10 +69,18 @@ export const connectMQTT = async (deviceId, onMessage) => {
         console.log('MQTT connected')
         console.log('Subscribing to:', topic)
 
-        client.subscribe(topic, (err) => {
+        client.subscribe(topic, (err, granted) => {
           if (err) {
             console.error('Subscribe error:', err)
             settleReject(err)
+            return
+          }
+
+          const rejected = (granted || []).some((g) => g.qos === 128)
+          if (rejected) {
+            const subackError = new Error(`Subscription rejected by broker for topic ${topic}`)
+            console.error('Subscribe rejected (QoS 128):', granted)
+            settleReject(subackError)
           } else {
             settleResolve()
           }

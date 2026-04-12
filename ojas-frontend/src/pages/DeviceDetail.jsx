@@ -101,9 +101,16 @@ export default function DeviceDetailPage() {
       setMqttConnected(true)
 
       console.log('Subscribing to:', topic)
-      client.subscribe(topic, (err) => {
+      client.subscribe(topic, (err, granted) => {
         if (err) {
           console.error('Subscription failed:', err)
+          return
+        }
+
+        const rejected = (granted || []).some((g) => g.qos === 128)
+        if (rejected) {
+          console.error('Subscription rejected by broker (QoS 128):', granted)
+          setMqttConnected(false)
         } else {
           subscribedTopicRef.current = topic
           console.log('Subscribed successfully')

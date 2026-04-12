@@ -56,9 +56,15 @@ export default function DeviceList({ devices = [] }) {
         return
       }
 
-      client.subscribe(topics, (err) => {
+      client.subscribe(topics, (err, granted) => {
         if (err) {
           console.error('Device topics subscribe failed:', err)
+          return
+        }
+
+        const rejected = (granted || []).filter((g) => g.qos === 128)
+        if (rejected.length > 0) {
+          console.error('Some device topic subscriptions were rejected (QoS 128):', rejected)
         }
       })
     })
