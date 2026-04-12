@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getDeviceById } from '../services/device.service'
 import Loader from '../components/common/Loader'
-import Loader from '../components/common/Loader'
 import { timeAgo } from '../utils/timeAgo'
 
 export default function DeviceDetailPage() {
