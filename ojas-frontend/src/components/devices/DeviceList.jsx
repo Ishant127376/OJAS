@@ -48,9 +48,17 @@ export default function DeviceList({ devices = [] }) {
     })
 
     client.on('connect', () => {
-      client.subscribe('device/+/telemetry', (err) => {
+      const topics = devices
+        .map((d) => d.topic || `device/${d.deviceId}/telemetry`)
+        .filter(Boolean)
+
+      if (!topics.length) {
+        return
+      }
+
+      client.subscribe(topics, (err) => {
         if (err) {
-          console.error('Wildcard subscribe failed:', err)
+          console.error('Device topics subscribe failed:', err)
         }
       })
     })
@@ -75,7 +83,7 @@ export default function DeviceList({ devices = [] }) {
     return () => {
       client.end(true)
     }
-  }, [])
+  }, [devices])
 
   const filtered = useMemo(() => {
     return devices.filter((d) => {
