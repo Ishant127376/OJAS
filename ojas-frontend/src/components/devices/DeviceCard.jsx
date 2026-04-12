@@ -1,10 +1,10 @@
 import { useNavigate } from 'react-router-dom'
 import { timeAgo } from '../../utils/timeAgo'
 
-export default function DeviceCard({ device, cardStatus }) {
+export default function DeviceCard({ device, cardStatus, lastSeenAt }) {
   const navigate = useNavigate()
-  const lastSeenLabel = device.lastSeen
-    ? `Last Seen: ${timeAgo(device.lastSeen)}`
+  const lastSeenLabel = lastSeenAt
+    ? `Last Seen: ${timeAgo(lastSeenAt)}`
     : 'No status yet'
 
   const deviceType = device.deviceType || 'END'

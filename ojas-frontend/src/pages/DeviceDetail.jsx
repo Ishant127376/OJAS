@@ -6,6 +6,25 @@ import { getDeviceById } from '../services/device.service'
 import Loader from '../components/common/Loader'
 import { timeAgo } from '../utils/timeAgo'
 
+const TELEMETRY_CACHE_KEY = 'ojas_recent_telemetry_by_device'
+
+const readTelemetryCache = () => {
+  try {
+    const raw = localStorage.getItem(TELEMETRY_CACHE_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+const writeTelemetryCache = (cache) => {
+  try {
+    localStorage.setItem(TELEMETRY_CACHE_KEY, JSON.stringify(cache))
+  } catch {
+    // ignore localStorage failures
+  }
+}
+
 export default function DeviceDetailPage() {
   const { id: deviceId } = useParams()
   const navigate = useNavigate()
@@ -31,7 +50,9 @@ export default function DeviceDetailPage() {
           return
         }
         setDevice(res)
-        setLastSeen(res.lastSeen)
+        const cachedTs = readTelemetryCache()[res.deviceId]
+        const backendTs = res.lastSeen ? new Date(res.lastSeen).getTime() : 0
+        setLastSeen(Math.max(backendTs, cachedTs || 0) || null)
       } catch (err) {
         console.error('Failed to fetch device:', err)
         setError('Failed to fetch device')
@@ -99,7 +120,11 @@ export default function DeviceDetailPage() {
           ...prev,
           ...parsed,
         }))
-        setLastSeen(Date.now())
+        const now = Date.now()
+        setLastSeen(now)
+        const cache = readTelemetryCache()
+        cache[device?.deviceId || deviceId] = now
+        writeTelemetryCache(cache)
       } catch (err) {
         console.error('MQTT parse error:', err)
       }

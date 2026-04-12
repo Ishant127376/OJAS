@@ -2,9 +2,28 @@ import mqtt from 'mqtt'
 import { useEffect, useMemo, useState } from 'react'
 import DeviceCard from './DeviceCard'
 
+const TELEMETRY_CACHE_KEY = 'ojas_recent_telemetry_by_device'
+
+const readTelemetryCache = () => {
+  try {
+    const raw = localStorage.getItem(TELEMETRY_CACHE_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+const writeTelemetryCache = (cache) => {
+  try {
+    localStorage.setItem(TELEMETRY_CACHE_KEY, JSON.stringify(cache))
+  } catch {
+    // ignore localStorage failures
+  }
+}
+
 export default function DeviceList({ devices = [] }) {
   const [filter, setFilter] = useState('all')
-  const [recentTelemetryByDevice, setRecentTelemetryByDevice] = useState({})
+  const [recentTelemetryByDevice, setRecentTelemetryByDevice] = useState(() => readTelemetryCache())
   const [liveTick, setLiveTick] = useState(0)
   const [, forceUpdate] = useState(0)
 
@@ -43,10 +62,14 @@ export default function DeviceList({ devices = [] }) {
       }
 
       const topicDeviceId = match[1]
-      setRecentTelemetryByDevice((prev) => ({
-        ...prev,
-        [topicDeviceId]: Date.now(),
-      }))
+      setRecentTelemetryByDevice((prev) => {
+        const next = {
+          ...prev,
+          [topicDeviceId]: Date.now(),
+        }
+        writeTelemetryCache(next)
+        return next
+      })
     })
 
     return () => {
@@ -103,7 +126,12 @@ export default function DeviceList({ devices = [] }) {
 
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
         {filtered.map((device) => (
-          <DeviceCard key={device.deviceId} device={device} cardStatus={getCardStatus(device)} />
+          <DeviceCard
+            key={device.deviceId}
+            device={device}
+            cardStatus={getCardStatus(device)}
+            lastSeenAt={recentTelemetryByDevice[device.deviceId] || device.lastSeen}
+          />
         ))}
       </div>
 
