@@ -1,14 +1,16 @@
 import { useNavigate } from 'react-router-dom'
 import { timeAgo } from '../../utils/timeAgo'
 
-export default function DeviceCard({ device }) {
+export default function DeviceCard({ device, mqttConnected }) {
   const navigate = useNavigate()
   const lastSeenLabel = device.lastSeen
     ? `Last Seen: ${timeAgo(device.lastSeen)}`
     : 'No status yet'
 
   const deviceType = device.deviceType || 'END'
-  const isOnline = device.status === 'online'
+  const isOnline = typeof mqttConnected === 'boolean'
+    ? mqttConnected
+    : device.status === 'online'
 
   const handleClick = () => {
     if (deviceType === 'DCB') {

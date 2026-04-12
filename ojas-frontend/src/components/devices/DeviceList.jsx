@@ -1,13 +1,36 @@
+import mqtt from 'mqtt'
 import { useEffect, useMemo, useState } from 'react'
 import DeviceCard from './DeviceCard'
 
 export default function DeviceList({ devices = [] }) {
   const [filter, setFilter] = useState('all')
+  const [mqttConnected, setMqttConnected] = useState(false)
   const [, forceUpdate] = useState(0)
 
   useEffect(() => {
     const id = setInterval(() => forceUpdate((n) => n + 1), 30000)
     return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    const client = mqtt.connect(import.meta.env.VITE_MQTT_WS_URL, {
+      username: import.meta.env.VITE_MQTT_USERNAME,
+      password: import.meta.env.VITE_MQTT_PASSWORD,
+      protocol: 'wss',
+      reconnectPeriod: 5000,
+      clean: true,
+      connectTimeout: 20000,
+    })
+
+    client.on('connect', () => setMqttConnected(true))
+    client.on('error', () => setMqttConnected(false))
+    client.on('offline', () => setMqttConnected(false))
+    client.on('close', () => setMqttConnected(false))
+
+    return () => {
+      setMqttConnected(false)
+      client.end(true)
+    }
   }, [])
 
   const filtered = useMemo(() => {
@@ -43,7 +66,7 @@ export default function DeviceList({ devices = [] }) {
 
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
         {filtered.map((device) => (
-          <DeviceCard key={device.deviceId} device={device} />
+          <DeviceCard key={device.deviceId} device={device} mqttConnected={mqttConnected} />
         ))}
       </div>
 
