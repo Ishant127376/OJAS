@@ -1,6 +1,6 @@
 import mqtt from 'mqtt'
 import { ArrowLeft } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getDeviceById } from '../services/device.service'
 import Loader from '../components/common/Loader'
@@ -11,10 +11,14 @@ export default function DeviceDetailPage() {
   const navigate = useNavigate()
   const [device, setDevice] = useState(null)
   const [telemetry, setTelemetry] = useState(null)
+  const [mqttConnected, setMqttConnected] = useState(false)
   const [lastSeen, setLastSeen] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
   const [, forceUpdate] = useState(0)
+  const clientRef = useRef(null)
+  const cleanupTimerRef = useRef(null)
+  const subscribedTopicRef = useRef(null)
 
   // Fetch device info once on mount
   useEffect(() => {
@@ -41,6 +45,26 @@ export default function DeviceDetailPage() {
 
   // MQTT connection — stable, never recreated unless deviceId changes
   useEffect(() => {
+    const topic = device?.topic
+    if (!topic) {
+      return
+    }
+
+    if (cleanupTimerRef.current) {
+      clearTimeout(cleanupTimerRef.current)
+      cleanupTimerRef.current = null
+    }
+
+    if (clientRef.current && subscribedTopicRef.current === topic) {
+      return
+    }
+
+    if (clientRef.current) {
+      clientRef.current.end(true)
+      clientRef.current = null
+      subscribedTopicRef.current = null
+    }
+
     const client = mqtt.connect(import.meta.env.VITE_MQTT_WS_URL, {
       username: import.meta.env.VITE_MQTT_USERNAME,
       password: import.meta.env.VITE_MQTT_PASSWORD,
@@ -49,16 +73,18 @@ export default function DeviceDetailPage() {
       clean: true,
       connectTimeout: 20000,
     })
+    clientRef.current = client
 
     client.on('connect', () => {
       console.log('MQTT connected')
+      setMqttConnected(true)
 
-      const topic = device?.topic || `device/${device?.deviceId || deviceId}/telemetry`
       console.log('Subscribing to:', topic)
       client.subscribe(topic, (err) => {
         if (err) {
           console.error('Subscription failed:', err)
         } else {
+          subscribedTopicRef.current = topic
           console.log('Subscribed successfully')
         }
       })
@@ -81,12 +107,29 @@ export default function DeviceDetailPage() {
 
     client.on('error', (err) => {
       console.error('MQTT error:', err)
+      setMqttConnected(false)
+    })
+
+    client.on('offline', () => {
+      setMqttConnected(false)
+    })
+
+    client.on('close', () => {
+      setMqttConnected(false)
     })
 
     return () => {
-      client.end(true)
+      const clientToClose = client
+      cleanupTimerRef.current = setTimeout(() => {
+        if (clientRef.current === clientToClose) {
+          setMqttConnected(false)
+          clientToClose.end(true)
+          clientRef.current = null
+          subscribedTopicRef.current = null
+        }
+      }, 150)
     }
-  }, [device?.deviceId, device?.topic, deviceId])
+  }, [device?.topic])
 
   // Auto-refresh relative time display every 30 seconds
   useEffect(() => {
@@ -130,8 +173,8 @@ export default function DeviceDetailPage() {
               </div>
             </div>
             <div className="text-right">
-              <span className={device.status === 'online' ? 'badge-online' : 'badge-offline'}>
-                {device.status === 'online' ? 'Online' : 'Offline'}
+              <span className={mqttConnected ? 'badge-online' : 'badge-offline'}>
+                {mqttConnected ? 'Online' : 'Offline'}
               </span>
               <p className="mt-2 text-sm text-textSecondary">
                 {lastSeen ? timeAgo(lastSeen) : 'Never'}
