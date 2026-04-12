@@ -18,20 +18,5 @@ export const timeAgo = (timestamp) => {
     return 'just now'
   }
 
-  const diffMinutes = now.diff(then, 'minute')
-  if (diffMinutes < 60) {
-    return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`
-  }
-
-  const diffHours = now.diff(then, 'hour')
-  if (diffHours < 24) {
-    return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`
-  }
-
-  const diffDays = now.diff(then, 'day')
-  if (diffDays === 1) {
-    return 'yesterday'
-  }
-
-  return `${diffDays} days ago`
+  return then.fromNow()
 }
