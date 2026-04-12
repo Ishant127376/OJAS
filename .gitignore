@@ -35,3 +35,35 @@ lerna-debug.log*
 *.njsproj
 *.sln
 *.sw?
+# =====================
+# JAVA / MAVEN
+# =====================
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# Maven wrapper logs / temp
+.mvn/
+!/.mvn/wrapper/maven-wrapper.jar
+!/.mvn/wrapper/maven-wrapper.properties
+
+# =====================
+# SYSTEM FILES
+# =====================
+Thumbs.db
+Desktop.ini
+
+# =====================
+# TEMP FILES
+# =====================
+*.tmp
+*.temp
+
+# =====================
+# VS CODE (optional cleanup)
+# =====================
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
