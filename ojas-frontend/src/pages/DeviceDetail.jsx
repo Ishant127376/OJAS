@@ -53,7 +53,7 @@ export default function DeviceDetailPage() {
     client.on('connect', () => {
       console.log('MQTT connected')
 
-      const topic = `device/${deviceId}/telemetry`
+      const topic = device?.topic || `device/${device?.deviceId || deviceId}/telemetry`
       console.log('Subscribing to:', topic)
       client.subscribe(topic, (err) => {
         if (err) {
@@ -86,7 +86,7 @@ export default function DeviceDetailPage() {
     return () => {
       client.end(true)
     }
-  }, [deviceId])
+  }, [device?.deviceId, device?.topic, deviceId])
 
   // Auto-refresh relative time display every 30 seconds
   useEffect(() => {
