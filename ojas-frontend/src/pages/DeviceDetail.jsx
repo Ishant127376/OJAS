@@ -1,11 +1,12 @@
 import { ArrowLeft } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getDeviceById, getTelemetryHistory } from '../services/device.service'
+import { getDeviceById } from '../services/device.service'
 import { connectMQTT, disconnect } from '../services/mqtt.service'
 import Loader from '../components/common/Loader'
 import EnergyMeter from '../components/sensors/EnergyMeter'
 import LiveChart from '../components/charts/LiveChart'
+import { timeAgo } from '../utils/timeAgo'
 
 export default function DeviceDetail() {
   const { id } = useParams()
@@ -32,30 +33,10 @@ export default function DeviceDetail() {
         }
 
         setDevice(deviceData)
-        const deviceId = deviceData.deviceId
-
-        const history = await getTelemetryHistory(deviceId)
-        const latest = history[0] || null
-
-        if (latest) {
-          setLiveReadings(latest)
-          lastMessageTimeRef.current = new Date(latest.timestamp).getTime()
-          setLastUpdatedSeconds(Math.floor((Date.now() - lastMessageTimeRef.current) / 1000))
-
-          const historyChartData = [...history]
-            .reverse()
-            .map((item) => ({
-              time: new Date(item.timestamp).toLocaleTimeString(),
-              power: item.power || 0,
-              voltage: item.voltage || 0,
-              current: item.current || 0,
-            }))
-
-          setChartData(historyChartData)
-        }
+        const topicOrDeviceId = deviceData.topic || deviceData.deviceId
 
         try {
-          await connectMQTT(deviceId, (data) => {
+          await connectMQTT(topicOrDeviceId, (data) => {
             setLiveReadings(data)
             lastMessageTimeRef.current = Date.now()
             setMqttConnected(true)
@@ -168,7 +149,7 @@ export default function DeviceDetail() {
               <p className="mt-2 text-sm text-textSecondary">
                 {lastUpdatedSeconds === null
                   ? 'Waiting for data...'
-                  : `Last updated: ${lastUpdatedSeconds}s ago`}
+                  : `Last updated: ${timeAgo(Date.now() - lastUpdatedSeconds * 1000)}`}
               </p>
             </div>
           </div>

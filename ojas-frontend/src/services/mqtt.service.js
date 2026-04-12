@@ -32,12 +32,15 @@ export const connectMQTT = async (deviceId, onMessage) => {
         clientId: `web_${deviceId}_${Date.now()}`,
         username: MQTT_USERNAME,
         password: MQTT_PASSWORD,
+        protocol: 'wss',
         clean: true,
-        connectTimeout: 4000,
-        reconnectPeriod: 2000,
+        connectTimeout: 20000,
+        reconnectPeriod: 5000,
       })
 
-      const topic = `device/${deviceId}/telemetry`
+      const topic = String(deviceId).includes('/')
+        ? String(deviceId)
+        : `device/${deviceId}/telemetry`
       activeTopic = topic
       let settled = false
       let connectionTimer = null
@@ -80,6 +83,8 @@ export const connectMQTT = async (deviceId, onMessage) => {
         if (receivedTopic !== activeTopic) {
           return
         }
+
+        console.log('Incoming:', receivedTopic, message.toString())
 
         try {
           const data = JSON.parse(message.toString())
