@@ -54,8 +54,6 @@ function App() {
       return
     }
 
-    console.log('Token from URL:', token)
-
     const needsRoleSelection = params.get('needsRoleSelection') === 'true'
     params.delete('token')
     params.delete('needsRoleSelection')
@@ -65,8 +63,6 @@ function App() {
     window.history.replaceState({}, '', nextUrl)
 
     localStorage.setItem('token', token)
-    console.log('Stored Token:', localStorage.getItem('token'))
-
     loginWithToken(token)
       .then((userData) => {
         const shouldSelectRole = needsRoleSelection || !userData?.isRoleSelected

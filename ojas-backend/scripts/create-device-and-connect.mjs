@@ -45,9 +45,9 @@ const connectWithCredentials = async ({ deviceId, mqttUsername, mqttPassword }) 
     connectTimeout: 20000,
     will: {
       topic: statusTopic,
-      payload: JSON.stringify({ status: 'offline', timestamp: new Date().toISOString() }),
+      payload: JSON.stringify({ status: 'offline', timestamp: Date.now() }),
       qos: 1,
-      retain: false,
+      retain: true,
     },
   })
 
@@ -55,8 +55,8 @@ const connectWithCredentials = async ({ deviceId, mqttUsername, mqttPassword }) 
     client.on('connect', () => {
       client.publish(
         statusTopic,
-        JSON.stringify({ status: 'online', timestamp: new Date().toISOString() }),
-        { qos: 1 },
+        JSON.stringify({ status: 'online', timestamp: Date.now() }),
+        { qos: 1, retain: true },
         (error) => {
           if (error) {
             reject(error)

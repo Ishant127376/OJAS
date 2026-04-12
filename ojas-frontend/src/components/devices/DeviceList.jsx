@@ -1,8 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import DeviceCard from './DeviceCard'
 
 export default function DeviceList({ devices = [] }) {
   const [filter, setFilter] = useState('all')
+  const [, forceUpdate] = useState(0)
+
+  useEffect(() => {
+    const id = setInterval(() => forceUpdate((n) => n + 1), 30000)
+    return () => clearInterval(id)
+  }, [])
 
   const filtered = useMemo(() => {
     return devices.filter((d) => {

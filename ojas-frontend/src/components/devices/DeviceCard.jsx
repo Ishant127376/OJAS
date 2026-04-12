@@ -1,8 +1,11 @@
 import { useNavigate } from 'react-router-dom'
-import { formatRelativeTime } from '../../utils/formatters'
+import { timeAgo } from '../../utils/timeAgo'
 
 export default function DeviceCard({ device }) {
   const navigate = useNavigate()
+  const lastSeenLabel = device.lastSeen
+    ? `Last Seen: ${timeAgo(device.lastSeen)}`
+    : 'No status yet'
 
   const deviceType = device.deviceType || 'END'
   const isOnline = device.status === 'online'
@@ -33,7 +36,7 @@ export default function DeviceCard({ device }) {
           {device.location && <p className="text-xs text-textSecondary mb-1">Location: {device.location}</p>}
           {device.tag && <p className="text-xs text-textSecondary mb-1">Tag: {device.tag}</p>}
           <p className="text-xs text-textSecondary">
-            {device.lastSeen ? `Last Seen: ${formatRelativeTime(device.lastSeen)}` : 'No status yet'}
+            {lastSeenLabel}
           </p>
         </div>
 

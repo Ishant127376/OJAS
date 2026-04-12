@@ -4,7 +4,7 @@ let client = null
 let activeTopic = null
 
 // MQTT Broker WebSocket URL
-const BROKER_URL = import.meta.env.VITE_MQTT_WS_URL 
+const BROKER_URL = import.meta.env.VITE_MQTT_WS_URL
 
 const MQTT_USERNAME = import.meta.env.VITE_MQTT_USERNAME
 const MQTT_PASSWORD = import.meta.env.VITE_MQTT_PASSWORD
@@ -84,16 +84,15 @@ export const connectMQTT = async (deviceId, onMessage) => {
           return
         }
 
-        console.log('Incoming:', receivedTopic, message.toString())
+        console.log('MQTT message received:', receivedTopic, message.toString())
 
         try {
-          const data = JSON.parse(message.toString())
-          console.log('Received:', data)
+          const parsed = JSON.parse(message.toString())
           if (onMessage) {
-            onMessage(data)
+            onMessage(parsed)
           }
-        } catch (err) {
-          console.error('Parse error:', err)
+        } catch (e) {
+          console.error('Failed to parse MQTT message:', e)
         }
       })
 
@@ -159,11 +158,12 @@ export const subscribe = (topic, onMessage) => {
 
   client.on('message', (receivedTopic, message) => {
     if (receivedTopic === topic) {
+      console.log('MQTT message received:', receivedTopic, message.toString())
       try {
-        const data = JSON.parse(message.toString())
-        onMessage(data)
-      } catch (err) {
-        console.error('Failed to parse message:', err)
+        const parsed = JSON.parse(message.toString())
+        onMessage(parsed)
+      } catch (e) {
+        console.error('Failed to parse MQTT message:', e)
       }
     }
   })

@@ -1,101 +1,99 @@
+import mqtt from 'mqtt'
 import { ArrowLeft } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getDeviceById } from '../services/device.service'
-import { connectMQTT, disconnect } from '../services/mqtt.service'
 import Loader from '../components/common/Loader'
-import EnergyMeter from '../components/sensors/EnergyMeter'
-import LiveChart from '../components/charts/LiveChart'
+import Loader from '../components/common/Loader'
 import { timeAgo } from '../utils/timeAgo'
 
-export default function DeviceDetail() {
-  const { id } = useParams()
+export default function DeviceDetailPage() {
+  const { id: deviceId } = useParams()
   const navigate = useNavigate()
   const [device, setDevice] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [telemetry, setTelemetry] = useState(null)
+  const [lastSeen, setLastSeen] = useState(null)
   const [error, setError] = useState(null)
-  const [liveReadings, setLiveReadings] = useState(null)
-  const [mqttConnected, setMqttConnected] = useState(false)
-  const [chartData, setChartData] = useState([])
-  const [lastUpdatedSeconds, setLastUpdatedSeconds] = useState(null)
-  const lastMessageTimeRef = useRef(null)
-  const monitorIntervalRef = useRef(null)
+  const [loading, setLoading] = useState(true)
+  const [, forceUpdate] = useState(0)
 
+  // Fetch device info once on mount
   useEffect(() => {
-    const loadDevice = async () => {
+    const fetchDevice = async () => {
       try {
         setLoading(true)
-        const deviceData = await getDeviceById(id)
-
-        if (!deviceData) {
+        const res = await getDeviceById(deviceId)
+        if (!res) {
           setError('Device not found')
           return
         }
-
-        setDevice(deviceData)
-        const topicOrDeviceId = deviceData.topic || deviceData.deviceId
-
-        try {
-          await connectMQTT(topicOrDeviceId, (data) => {
-            setLiveReadings(data)
-            lastMessageTimeRef.current = Date.now()
-            setMqttConnected(true)
-            setLastUpdatedSeconds(0)
-
-            setChartData((prev) => [
-              ...prev.slice(-9),
-              {
-                time: new Date().toLocaleTimeString(),
-                power: data.power || 0,
-                voltage: data.voltage || 0,
-                current: data.current || 0,
-              },
-            ])
-          })
-
-          if (monitorIntervalRef.current) {
-            clearInterval(monitorIntervalRef.current)
-          }
-
-          monitorIntervalRef.current = setInterval(() => {
-            const lastMessageTime = lastMessageTimeRef.current
-
-            if (!lastMessageTime) {
-              setMqttConnected(false)
-              setLastUpdatedSeconds(null)
-              return
-            }
-
-            const diff = Date.now() - lastMessageTime
-            const secondsAgo = Math.floor(diff / 1000)
-            setLastUpdatedSeconds(secondsAgo)
-
-            if (diff > 10000) {
-              setMqttConnected(false)
-            }
-          }, 2000)
-        } catch (mqttErr) {
-          console.error('MQTT connection failed:', mqttErr)
-          setMqttConnected(false)
-        }
+        setDevice(res)
+        setLastSeen(res.lastSeen)
       } catch (err) {
-        console.error('Error loading device:', err)
-        setError(err.message)
+        console.error('Failed to fetch device:', err)
+        setError('Failed to fetch device')
       } finally {
         setLoading(false)
       }
     }
 
-    loadDevice()
+    fetchDevice()
+  }, [deviceId])
+
+  // MQTT connection — stable, never recreated unless deviceId changes
+  useEffect(() => {
+    const client = mqtt.connect(import.meta.env.VITE_MQTT_WS_URL, {
+      username: import.meta.env.VITE_MQTT_USERNAME,
+      password: import.meta.env.VITE_MQTT_PASSWORD,
+      protocol: 'wss',
+      reconnectPeriod: 5000,
+      clean: true,
+      connectTimeout: 20000,
+    })
+
+    client.on('connect', () => {
+      console.log('MQTT connected')
+
+      const topic = device?.topic || `device/${device?.deviceId || deviceId}/telemetry`
+      console.log('Subscribing to:', topic)
+      client.subscribe(topic, (err) => {
+        if (err) {
+          console.error('Subscription failed:', err)
+        } else {
+          console.log('Subscribed successfully')
+        }
+      })
+    })
+
+    client.on('message', (topic, message) => {
+      console.log('Incoming:', topic, message.toString())
+      try {
+        const parsed = JSON.parse(message.toString())
+        console.log('MQTT message received:', topic, parsed)
+        setTelemetry((prev) => ({
+          ...prev,
+          ...parsed,
+        }))
+        setLastSeen(Date.now())
+      } catch (err) {
+        console.error('MQTT parse error:', err)
+      }
+    })
+
+    client.on('error', (err) => {
+      console.error('MQTT error:', err)
+    })
 
     return () => {
-      if (monitorIntervalRef.current) {
-        clearInterval(monitorIntervalRef.current)
-      }
-      lastMessageTimeRef.current = null
-      disconnect()
+      client.end(true)
     }
-  }, [id])
+  }, [device?.deviceId, device?.topic, deviceId])
+
+  // Auto-refresh relative time display every 30 seconds
+  useEffect(() => {
+    const id = setInterval(() => forceUpdate((n) => n + 1), 30000)
+    return () => clearInterval(id)
+  }, [])
 
   if (loading) return <Loader />
 
@@ -113,16 +111,8 @@ export default function DeviceDetail() {
     )
   }
 
-  const readings = liveReadings || {
-    voltage: 0,
-    current: 0,
-    power: 0,
-    temperature: 0,
-  }
-
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <button onClick={() => navigate('/devices')} className="mb-4 flex items-center gap-2 text-primary hover:text-primary/80">
           <ArrowLeft className="h-5 w-5" />
@@ -141,94 +131,50 @@ export default function DeviceDetail() {
               </div>
             </div>
             <div className="text-right">
-              <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                mqttConnected ? 'bg-success/20 text-success' : 'bg-danger/20 text-danger'
-              }`}>
-                {mqttConnected ? 'Live' : 'Offline'}
-              </div>
+              <span className={device.status === 'online' ? 'badge-online' : 'badge-offline'}>
+                {device.status === 'online' ? 'Online' : 'Offline'}
+              </span>
               <p className="mt-2 text-sm text-textSecondary">
-                {lastUpdatedSeconds === null
-                  ? 'Waiting for data...'
-                  : `Last updated: ${timeAgo(Date.now() - lastUpdatedSeconds * 1000)}`}
+                {lastSeen ? timeAgo(lastSeen) : 'Never'}
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Live Readings */}
       <div>
         <h2 className="mb-4 text-lg font-semibold text-textPrimary">Live Readings</h2>
-        {liveReadings ? (
-          <div className="space-y-4">
-            <EnergyMeter readings={readings} />
-            <div className="section-card grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              <div>
-                <p className="text-xs text-textSecondary">Voltage</p>
-                <p className="text-lg font-semibold text-textPrimary">{readings.voltage} V</p>
-              </div>
-              <div>
-                <p className="text-xs text-textSecondary">Current</p>
-                <p className="text-lg font-semibold text-textPrimary">{readings.current} A</p>
-              </div>
-              <div>
-                <p className="text-xs text-textSecondary">Power</p>
-                <p className="text-lg font-semibold text-textPrimary">{readings.power} W</p>
-              </div>
-              <div>
-                <p className="text-xs text-textSecondary">Temperature</p>
-                <p className="text-lg font-semibold text-textPrimary">{readings.temperature} °C</p>
-              </div>
-              <div>
-                <p className="text-xs text-textSecondary">Status</p>
-                <p className={`text-lg font-semibold ${readings.status === 'HIGH_LOAD' ? 'text-warning' : 'text-success'}`}>
-                  {readings.status || 'NORMAL'}
-                </p>
-              </div>
+        {telemetry ? (
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="section-card">
+              <p className="text-xs text-textSecondary">Voltage</p>
+              <p className="text-lg font-semibold text-textPrimary">{telemetry.voltage} V</p>
+            </div>
+            <div className="section-card">
+              <p className="text-xs text-textSecondary">Current</p>
+              <p className="text-lg font-semibold text-textPrimary">{telemetry.current} A</p>
+            </div>
+            <div className="section-card">
+              <p className="text-xs text-textSecondary">Power</p>
+              <p className="text-lg font-semibold text-textPrimary">{telemetry.power} W</p>
+            </div>
+            <div className="section-card">
+              <p className="text-xs text-textSecondary">Frequency</p>
+              <p className="text-lg font-semibold text-textPrimary">{telemetry.frequency} Hz</p>
+            </div>
+            <div className="section-card">
+              <p className="text-xs text-textSecondary">Power Factor</p>
+              <p className="text-lg font-semibold text-textPrimary">{telemetry.powerFactor}</p>
+            </div>
+            <div className="section-card">
+              <p className="text-xs text-textSecondary">Energy</p>
+              <p className="text-lg font-semibold text-textPrimary">{telemetry.energy} kWh</p>
             </div>
           </div>
         ) : (
-          <div className="section-card text-center py-12">
-            <p className="text-textSecondary">Waiting for MQTT data...</p>
-          </div>
+          <p>Waiting for MQTT data...</p>
         )}
       </div>
-
-      {/* Temperature Display */}
-      {readings.temperature > 0 && (
-        <div>
-          <h2 className="mb-4 text-lg font-semibold text-textPrimary">Temperature Monitor</h2>
-          <div className="section-card">
-            <div className="flex items-baseline gap-3 mb-4">
-              <span className="font-mono text-4xl font-bold text-textPrimary">{readings.temperature.toFixed(1)}°C</span>
-              <span className={`text-sm ${
-                readings.temperature > 50 ? 'text-danger' :
-                readings.temperature > 40 ? 'text-warning' :
-                'text-success'
-              }`}>
-                {readings.temperature > 50 ? 'High' :
-                 readings.temperature > 40 ? 'Moderate' :
-                 'Normal'}
-              </span>
-            </div>
-            <div className="h-3 w-full rounded-full bg-border/50 overflow-hidden">
-              <div
-                className={`h-full transition-all ${
-                  readings.temperature > 50 ? 'bg-danger' :
-                  readings.temperature > 40 ? 'bg-warning' :
-                  'bg-success'
-                }`}
-                style={{ width: `${Math.min(readings.temperature, 60) / 0.6}%` }}
-              ></div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Live Chart */}
-      {chartData.length > 0 && (
-        <LiveChart data={chartData} dataKey="power" name="Live Power Data" color="#3B82F6" />
-      )}
     </div>
   )
 }
