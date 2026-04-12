@@ -8,6 +8,7 @@ import authRoutes from './routes/auth.routes.js'
 import telemetryRoutes from './routes/telemetry.routes.js'
 import adminRoutes from './routes/admin.routes.js'
 import { getMqttClient } from './config/mqtt.js'
+import { startDlmsPolling } from './services/dlms-poller.service.js'
 import { requestLogger } from './middleware/request-logger.middleware.js'
 import passport, { configurePassport } from './config/passport.js'
 
@@ -65,13 +66,6 @@ app.get('/health/mqtt', (req, res) => {
   })
 })
 
-app.get('/health/mqtt', (req, res) => {
-  const mqttClient = getMqttClient()
-  res.status(200).json({
-    connected: Boolean(mqttClient?.connected),
-  })
-})
-
 // Routes
 app.use('/api/auth', authRoutes)
 app.use('/auth', authRoutes)
@@ -105,6 +99,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000
 
 app.listen(PORT, () => {
+  startDlmsPolling()
   console.log(`🚀 Server running on port ${PORT}`)
 })
 

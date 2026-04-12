@@ -73,6 +73,84 @@ const deviceSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    sourceType: {
+      type: String,
+      enum: ['PUSH', 'DLMS'],
+      default: 'PUSH',
+      index: true,
+    },
+    dlms: {
+      enabled: {
+        type: Boolean,
+        default: false,
+        index: true,
+      },
+      transport: {
+        type: String,
+        enum: ['serial', 'tcp'],
+        default: null,
+      },
+      host: {
+        type: String,
+        default: null,
+        trim: true,
+      },
+      port: {
+        type: Number,
+        default: null,
+      },
+      serialPort: {
+        type: String,
+        default: null,
+        trim: true,
+      },
+      baudRate: {
+        type: Number,
+        default: null,
+      },
+      clientAddress: {
+        type: Number,
+        default: 16,
+      },
+      serverAddress: {
+        type: Number,
+        default: 1,
+      },
+      authentication: {
+        type: String,
+        default: 'NONE',
+        trim: true,
+      },
+      password: {
+        type: String,
+        default: null,
+      },
+      security: {
+        type: String,
+        default: 'NONE',
+        trim: true,
+      },
+      systemTitle: {
+        type: String,
+        default: null,
+      },
+      blockCipherKey: {
+        type: String,
+        default: null,
+      },
+      authenticationKey: {
+        type: String,
+        default: null,
+      },
+      pollIntervalSec: {
+        type: Number,
+        default: null,
+      },
+      obisMap: {
+        type: mongoose.Schema.Types.Mixed,
+        default: {},
+      },
+    },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

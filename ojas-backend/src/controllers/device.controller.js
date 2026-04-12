@@ -80,8 +80,9 @@ const getAccessibleOwnerIds = async (authUser) => {
 
 export const addDevice = async (req, res) => {
   try {
-    const { name, deviceType, location, tag, description, subDevices } = req.body
+    const { name, deviceType, location, tag, description, subDevices, sourceType, dlms } = req.body
     const normalizedType = typeof deviceType === 'string' ? deviceType.trim().toUpperCase() : ''
+    const normalizedSourceType = typeof sourceType === 'string' ? sourceType.trim().toUpperCase() : 'PUSH'
 
     if (!name || typeof name !== 'string' || name.trim() === '') {
       return res.status(400).json({
@@ -99,6 +100,16 @@ export const addDevice = async (req, res) => {
         error: {
           code: 'INVALID_DEVICE_TYPE',
           message: 'deviceType must be either END or DCB',
+        },
+      })
+    }
+
+    if (!['PUSH', 'DLMS'].includes(normalizedSourceType)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_SOURCE_TYPE',
+          message: 'sourceType must be either PUSH or DLMS',
         },
       })
     }
@@ -132,6 +143,30 @@ export const addDevice = async (req, res) => {
       mqttUsername,
       mqttPassword,
       topic,
+      sourceType: normalizedSourceType,
+      dlms: normalizedSourceType === 'DLMS' && dlms && typeof dlms === 'object'
+        ? {
+            enabled: dlms.enabled ?? true,
+            transport: typeof dlms.transport === 'string' ? dlms.transport : null,
+            host: typeof dlms.host === 'string' ? dlms.host.trim() : null,
+            port: Number.isFinite(Number(dlms.port)) ? Number(dlms.port) : null,
+            serialPort: typeof dlms.serialPort === 'string' ? dlms.serialPort.trim() : null,
+            baudRate: Number.isFinite(Number(dlms.baudRate)) ? Number(dlms.baudRate) : null,
+            clientAddress: Number.isFinite(Number(dlms.clientAddress)) ? Number(dlms.clientAddress) : 16,
+            serverAddress: Number.isFinite(Number(dlms.serverAddress)) ? Number(dlms.serverAddress) : 1,
+            authentication: typeof dlms.authentication === 'string' ? dlms.authentication : 'NONE',
+            password: typeof dlms.password === 'string' ? dlms.password : null,
+            security: typeof dlms.security === 'string' ? dlms.security : 'NONE',
+            systemTitle: typeof dlms.systemTitle === 'string' ? dlms.systemTitle : null,
+            blockCipherKey: typeof dlms.blockCipherKey === 'string' ? dlms.blockCipherKey : null,
+            authenticationKey: typeof dlms.authenticationKey === 'string' ? dlms.authenticationKey : null,
+            pollIntervalSec: Number.isFinite(Number(dlms.pollIntervalSec)) ? Number(dlms.pollIntervalSec) : null,
+            obisMap: dlms.obisMap && typeof dlms.obisMap === 'object' ? dlms.obisMap : {},
+          }
+        : {
+            enabled: false,
+            obisMap: {},
+          },
       userId: req.user._id,
       createdBy: req.user._id,
       status: 'offline',
@@ -154,6 +189,8 @@ export const addDevice = async (req, res) => {
         mqttUsername: newDevice.mqttUsername,
         mqttPassword: newDevice.mqttPassword,
         topic: newDevice.topic,
+        sourceType: newDevice.sourceType,
+        dlms: newDevice.dlms,
         userId: newDevice.userId,
         createdBy: newDevice.createdBy,
         status: newDevice.status,
@@ -202,6 +239,8 @@ export const getDevices = async (req, res) => {
       description: 1,
       subDevices: 1,
       topic: 1,
+      sourceType: 1,
+      dlms: 1,
       userId: 1,
       createdBy: 1,
       status: 1,
