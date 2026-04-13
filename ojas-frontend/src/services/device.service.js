@@ -118,6 +118,24 @@ export const addDevice = async (deviceData) => {
   }
 }
 
+export const getTelemetryHistory = async (deviceId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/telemetry/${deviceId}`, {
+      headers: getAuthHeaders(),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Telemetry API error: ${response.status}`)
+    }
+
+    const json = await response.json()
+    return Array.isArray(json.data) ? json.data : []
+  } catch (error) {
+    console.error('[DeviceService] GET /telemetry failed:', error)
+    return []
+  }
+}
+
 export const cleanupTelemetryHistory = async (days = 30) => {
   try {
     const response = await fetch(`${API_BASE_URL}/telemetry/cleanup?days=${Number(days)}`, {

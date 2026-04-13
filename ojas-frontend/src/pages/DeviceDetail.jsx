@@ -1,12 +1,14 @@
 import mqtt from 'mqtt'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Download } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getDeviceById } from '../services/device.service'
+import { getDeviceById, getTelemetryHistory } from '../services/device.service'
 import Loader from '../components/common/Loader'
+import HistoryChart from '../components/charts/HistoryChart'
 import { timeAgo } from '../utils/timeAgo'
 
 const TELEMETRY_CACHE_KEY = 'ojas_recent_telemetry_by_device'
+const TELEMETRY_PAYLOAD_CACHE_KEY = 'ojas_recent_telemetry_payload_by_device'
 
 const readTelemetryCache = () => {
   try {
@@ -25,11 +27,30 @@ const writeTelemetryCache = (cache) => {
   }
 }
 
+const readTelemetryPayloadCache = () => {
+  try {
+    const raw = localStorage.getItem(TELEMETRY_PAYLOAD_CACHE_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+const writeTelemetryPayloadCache = (cache) => {
+  try {
+    localStorage.setItem(TELEMETRY_PAYLOAD_CACHE_KEY, JSON.stringify(cache))
+  } catch {
+    // ignore localStorage failures
+  }
+}
+
 export default function DeviceDetailPage() {
   const { id: deviceId } = useParams()
   const navigate = useNavigate()
   const [device, setDevice] = useState(null)
   const [telemetry, setTelemetry] = useState(null)
+  const [telemetryHistory, setTelemetryHistory] = useState([])
+  const [selectedMetric, setSelectedMetric] = useState('voltage')
   const [mqttConnected, setMqttConnected] = useState(false)
   const [lastSeen, setLastSeen] = useState(null)
   const [error, setError] = useState(null)
@@ -50,6 +71,24 @@ export default function DeviceDetailPage() {
           return
         }
         setDevice(res)
+
+        const history = await getTelemetryHistory(res.deviceId)
+        setTelemetryHistory(history)
+
+        const payloadCache = readTelemetryPayloadCache()
+        const cachedPayload = payloadCache[res.deviceId]
+        if (cachedPayload && typeof cachedPayload === 'object') {
+          setTelemetry(cachedPayload)
+        } else if (res.lastTelemetry && typeof res.lastTelemetry === 'object') {
+          setTelemetry({
+            voltage: res.lastTelemetry.voltage,
+            current: res.lastTelemetry.current,
+            power: res.lastTelemetry.power,
+            temperature: res.lastTelemetry.temperature,
+            timestamp: res.lastTelemetry.timestamp,
+          })
+        }
+
         const cachedTs = readTelemetryCache()[res.deviceId]
         const backendTs = res.lastSeen ? new Date(res.lastSeen).getTime() : 0
         setLastSeen(Math.max(backendTs, cachedTs || 0) || null)
@@ -127,6 +166,22 @@ export default function DeviceDetailPage() {
           ...prev,
           ...parsed,
         }))
+
+        setTelemetryHistory((prev) => [
+          {
+            ...parsed,
+            timestamp: parsed.timestamp || new Date().toISOString(),
+          },
+          ...prev,
+        ].slice(0, 200))
+
+        const payloadCache = readTelemetryPayloadCache()
+        payloadCache[device?.deviceId || deviceId] = {
+          ...(payloadCache[device?.deviceId || deviceId] || {}),
+          ...parsed,
+        }
+        writeTelemetryPayloadCache(payloadCache)
+
         const now = Date.now()
         setLastSeen(now)
         const cache = readTelemetryCache()
@@ -183,6 +238,48 @@ export default function DeviceDetailPage() {
         </div>
       </div>
     )
+  }
+
+  const metricOptions = [
+    { key: 'voltage', label: 'Voltage' },
+    { key: 'current', label: 'Current' },
+    { key: 'power', label: 'Power' },
+    { key: 'energy', label: 'Energy' },
+  ]
+
+  const historyChartData = telemetryHistory
+    .slice()
+    .reverse()
+    .map((item) => {
+      const ts = item?.timestamp ? new Date(item.timestamp) : null
+      const validTs = ts && !Number.isNaN(ts.getTime()) ? ts : null
+      return {
+        day: validTs ? validTs.toLocaleString() : 'Unknown',
+        voltage: item?.voltage ?? null,
+        current: item?.current ?? null,
+        power: item?.power ?? null,
+        energy: item?.energy ?? null,
+      }
+    })
+
+  const downloadCsv = () => {
+    const headers = ['timestamp', 'voltage', 'current', 'power', 'temperature', 'frequency', 'powerFactor', 'energy']
+    const rows = telemetryHistory.map((item) => headers.map((h) => {
+      const rawValue = item?.[h] ?? ''
+      const value = String(rawValue).replace(/"/g, '""')
+      return `"${value}"`
+    }).join(','))
+
+    const csv = [headers.join(','), ...rows].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${device.deviceId}-telemetry.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -247,6 +344,42 @@ export default function DeviceDetailPage() {
           </div>
         ) : (
           <p>Waiting for MQTT data...</p>
+        )}
+      </div>
+
+      <div className="section-card space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-textPrimary">History</h2>
+          <div className="flex items-center gap-3">
+            <select
+              value={selectedMetric}
+              onChange={(e) => setSelectedMetric(e.target.value)}
+              className="rounded-md border border-border/40 bg-surface px-3 py-2 text-sm text-textPrimary"
+            >
+              {metricOptions.map((option) => (
+                <option key={option.key} value={option.key}>{option.label}</option>
+              ))}
+            </select>
+            <button
+              onClick={downloadCsv}
+              className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary/90"
+              type="button"
+            >
+              <Download className="h-4 w-4" />
+              Download CSV
+            </button>
+          </div>
+        </div>
+
+        {historyChartData.length > 0 ? (
+          <HistoryChart
+            data={historyChartData}
+            dataKey={selectedMetric}
+            name={metricOptions.find((m) => m.key === selectedMetric)?.label || 'Metric'}
+            color="#22C55E"
+          />
+        ) : (
+          <p className="text-sm text-textSecondary">No telemetry history available yet.</p>
         )}
       </div>
     </div>
