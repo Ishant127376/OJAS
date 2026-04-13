@@ -9,6 +9,7 @@ import { timeAgo } from '../utils/timeAgo'
 
 const TELEMETRY_CACHE_KEY = 'ojas_recent_telemetry_by_device'
 const TELEMETRY_PAYLOAD_CACHE_KEY = 'ojas_recent_telemetry_payload_by_device'
+const TELEMETRY_HISTORY_CACHE_KEY = 'ojas_recent_telemetry_history_by_device'
 
 const readTelemetryCache = () => {
   try {
@@ -44,6 +45,23 @@ const writeTelemetryPayloadCache = (cache) => {
   }
 }
 
+const readTelemetryHistoryCache = () => {
+  try {
+    const raw = localStorage.getItem(TELEMETRY_HISTORY_CACHE_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+const writeTelemetryHistoryCache = (cache) => {
+  try {
+    localStorage.setItem(TELEMETRY_HISTORY_CACHE_KEY, JSON.stringify(cache))
+  } catch {
+    // ignore localStorage failures
+  }
+}
+
 export default function DeviceDetailPage() {
   const { id: deviceId } = useParams()
   const navigate = useNavigate()
@@ -73,7 +91,28 @@ export default function DeviceDetailPage() {
         setDevice(res)
 
         const history = await getTelemetryHistory(res.deviceId)
-        setTelemetryHistory(history)
+        const historyCache = readTelemetryHistoryCache()
+        const cachedHistory = Array.isArray(historyCache[res.deviceId]) ? historyCache[res.deviceId] : []
+        const mergedHistory = [...history, ...cachedHistory]
+          .filter((item) => item && (item.timestamp || item.createdAt || item.updatedAt))
+          .sort((a, b) => new Date(b.timestamp || b.createdAt || b.updatedAt) - new Date(a.timestamp || a.createdAt || a.updatedAt))
+
+        const dedupedHistory = []
+        const seen = new Set()
+        for (const item of mergedHistory) {
+          const key = `${item.timestamp || item.createdAt || item.updatedAt}-${item.voltage ?? ''}-${item.current ?? ''}-${item.power ?? ''}-${item.energy ?? ''}`
+          if (!seen.has(key)) {
+            seen.add(key)
+            dedupedHistory.push(item)
+          }
+          if (dedupedHistory.length >= 500) {
+            break
+          }
+        }
+
+        setTelemetryHistory(dedupedHistory)
+        historyCache[res.deviceId] = dedupedHistory
+        writeTelemetryHistoryCache(historyCache)
 
         const payloadCache = readTelemetryPayloadCache()
         const cachedPayload = payloadCache[res.deviceId]
@@ -168,12 +207,22 @@ export default function DeviceDetailPage() {
         }))
 
         setTelemetryHistory((prev) => [
+          ...prev,
           {
             ...parsed,
             timestamp: parsed.timestamp || new Date().toISOString(),
           },
-          ...prev,
-        ].slice(0, 200))
+        ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 500))
+
+        const historyCache = readTelemetryHistoryCache()
+        historyCache[device?.deviceId || deviceId] = [
+          ...(historyCache[device?.deviceId || deviceId] || []),
+          {
+            ...parsed,
+            timestamp: parsed.timestamp || new Date().toISOString(),
+          },
+        ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 500)
+        writeTelemetryHistoryCache(historyCache)
 
         const payloadCache = readTelemetryPayloadCache()
         payloadCache[device?.deviceId || deviceId] = {
@@ -262,9 +311,23 @@ export default function DeviceDetailPage() {
       }
     })
 
+  const fallbackHistoryRow = telemetry
+    ? [{
+        timestamp: telemetry.timestamp || (lastSeen ? new Date(lastSeen).toISOString() : new Date().toISOString()),
+        voltage: telemetry.voltage ?? null,
+        current: telemetry.current ?? null,
+        power: telemetry.power ?? null,
+        temperature: telemetry.temperature ?? null,
+        frequency: telemetry.frequency ?? null,
+        powerFactor: telemetry.powerFactor ?? null,
+        energy: telemetry.energy ?? null,
+      }]
+    : []
+
   const downloadCsv = () => {
     const headers = ['timestamp', 'voltage', 'current', 'power', 'temperature', 'frequency', 'powerFactor', 'energy']
-    const rows = telemetryHistory.map((item) => headers.map((h) => {
+    const sourceRows = telemetryHistory.length > 0 ? telemetryHistory : fallbackHistoryRow
+    const rows = sourceRows.map((item) => headers.map((h) => {
       const rawValue = item?.[h] ?? ''
       const value = String(rawValue).replace(/"/g, '""')
       return `"${value}"`
