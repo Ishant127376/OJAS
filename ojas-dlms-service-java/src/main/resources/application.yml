@@ -1,9 +1,0 @@
-server:
-  port: ${PORT:8086}
-
-ojas:
-  dlms:
-    api-key: ${DLMS_SERVICE_API_KEY:}
-    # Optional: bridge to existing Python reader command.
-    # Example: python C:/path/to/read_meter.py
-    python-bridge-command: ${DLMS_PYTHON_BRIDGE_COMMAND:}

@@ -1,9 +1,11 @@
-# Dependencies
+# =====================
+# NODE
+# =====================
 node_modules/
 
 # Environment files
 .env
-.env.example
+.env.*
 .env.local
 .env.*.local
 *.local
@@ -23,47 +25,35 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# OS files
-.DS_Store
+# =====================
+# PYTHON
+# =====================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.pytest_cache/
 
-# IDE/editor files
+# =====================
+# CONFIG / SECRETS
+# =====================
+config.json
+
+# =====================
+# OS FILES
+# =====================
+.DS_Store
+Thumbs.db
+
+# =====================
+# IDE / EDITOR
+# =====================
+.vscode/
 .idea/
-.vscode/*
-!.vscode/extensions.json
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-# =====================
-# JAVA / MAVEN
-# =====================
-target/
-*.class
-*.jar
-*.war
-*.ear
-
-# Maven wrapper logs / temp
-.mvn/
-!/.mvn/wrapper/maven-wrapper.jar
-!/.mvn/wrapper/maven-wrapper.properties
-
-# =====================
-# SYSTEM FILES
-# =====================
-Thumbs.db
-Desktop.ini
-
-# =====================
-# TEMP FILES
-# =====================
-*.tmp
-*.temp
-
-# =====================
-# VS CODE (optional cleanup)
-# =====================
-.vscode/settings.json
-.vscode/launch.json
-.vscode/tasks.json
