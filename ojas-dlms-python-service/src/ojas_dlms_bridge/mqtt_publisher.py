@@ -49,6 +49,18 @@ class MqttPublisher:
         self.client.connect(self.settings.endpoint, self.settings.port, keepalive=60)
         self.client.loop_start()
 
+    def _ensure_connected(self) -> bool:
+        if self.connected:
+            return True
+
+        self.logger.warning("MQTT not connected, attempting reconnect")
+        try:
+            self.client.reconnect()
+        except Exception as exc:
+            self.logger.error("MQTT reconnect call failed: %s", exc)
+
+        return self.wait_until_connected(timeout_sec=10)
+
     def wait_until_connected(self, timeout_sec: int = 10) -> bool:
         start = time.time()
         while time.time() - start < timeout_sec:
@@ -57,21 +69,24 @@ class MqttPublisher:
             time.sleep(0.2)
         return False
 
-    def publish_json(self, topic: str, payload: Dict[str, Any], qos: int = 1) -> bool:
-        if not self.connected:
-            self.logger.warning("MQTT publish skipped because client is not connected")
+    def publish(self, topic: str, payload: str, qos: int = 1) -> bool:
+        if not self._ensure_connected():
+            self.logger.error("MQTT publish failed: not connected")
             return False
 
-        data = json.dumps(payload, separators=(",", ":"))
-        result = self.client.publish(topic, data, qos=qos)
+        result = self.client.publish(topic, payload, qos=qos)
         result.wait_for_publish(timeout=5)
 
         if result.rc != mqtt.MQTT_ERR_SUCCESS:
             self.logger.error("MQTT publish failed rc=%s topic=%s", result.rc, topic)
             return False
 
-        self.logger.info("MQTT published topic=%s payload=%s", topic, data)
+        self.logger.info("Data published to %s: %s", topic, payload)
         return True
+
+    def publish_json(self, topic: str, payload: Dict[str, Any], qos: int = 1) -> bool:
+        data = json.dumps(payload, separators=(",", ":"))
+        return self.publish(topic, data, qos=qos)
 
     def close(self) -> None:
         try:

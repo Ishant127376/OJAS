@@ -1,5 +1,6 @@
 {
   "device_id": "END-1775462554328-4630",
+  "simulation": false,
   "poll_interval_sec": 5,
   "retry_delay_sec": 3,
   "mqtt": {

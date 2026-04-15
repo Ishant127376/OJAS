@@ -22,7 +22,7 @@ Smart meter (DLMS over serial) -> Python bridge -> MQTT publish -> React dashboa
   "voltage": 230,
   "current": 5.2,
   "energy": 1234,
-  "timestamp": 1710000000000
+  "timestamp": 1710000000
 }
 ```
 
@@ -63,6 +63,6 @@ You can override config values with environment variables using `.env.example` k
 
 ## Notes
 
-- `pub_topic` defaults to `device/{deviceId}/telemetry` if omitted.
+- `pub_topic` is required and should be `device/{deviceId}/telemetry`.
 - Keep `client_id` unique per bridge instance.
 - If your meter needs different OBIS mapping, edit `dlms.obis_map` in config.

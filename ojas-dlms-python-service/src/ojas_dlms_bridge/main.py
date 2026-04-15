@@ -3,6 +3,8 @@ import signal
 import sys
 
 from .bridge_service import DlmsMqttBridgeService
+from .dlms_reader import DlmsMeterReader
+from .mqtt_publisher import MqttPublisher
 from .settings import load_settings
 
 
@@ -20,7 +22,9 @@ def main() -> int:
 
     logger.info("Starting OJAS DLMS bridge device=%s topic=%s", settings.device_id, settings.publish_topic)
 
-    service = DlmsMqttBridgeService(settings, logger)
+    reader = DlmsMeterReader(settings.dlms, logger)
+    publisher = MqttPublisher(settings.mqtt, logger)
+    service = DlmsMqttBridgeService(settings, reader, publisher, logger)
 
     def _shutdown(signum, frame):
         logger.info("Shutdown signal received (%s)", signum)

@@ -1,4 +1,5 @@
 import logging
+import random
 import time
 from typing import Dict, Any
 
@@ -41,8 +42,16 @@ class DlmsMeterReader:
         self.logger = logger
         self.ser = None
         self.client = None
+        self._simulation_started_at = time.time()
+        self._simulation_energy_base = random.randint(1000, 100000)
+        self._simulation_voltage_base = random.uniform(228.0, 232.0)
+        self._simulation_current_base = random.uniform(4.5, 6.5)
 
     def connect(self) -> None:
+        if getattr(self.settings, "simulation", False):
+            self.logger.info("Simulation mode enabled: skipping DLMS serial connection")
+            return
+
         if self.ser and self.ser.is_open and self.client is not None:
             return
 
@@ -86,7 +95,7 @@ class DlmsMeterReader:
         # For WRAPPER framing, payload starts after 8-byte wrapper header.
         payload = aare[8:] if len(aare) > 8 else aare
         self.client.parseAareResponse(GXByteBuffer(payload))
-        self.logger.info("DLMS association successful")
+        self.logger.info("DLMS connected")
 
     def _send_and_receive(self, data: Any, name: str) -> bytes:
         if isinstance(data, list):
@@ -123,7 +132,13 @@ class DlmsMeterReader:
         value = getattr(obj, "value", None)
         return value
 
-    def read_metrics(self) -> Dict[str, Any]:
+    def read_all(self) -> Dict[str, Any]:
+        if getattr(self.settings, "simulation", False):
+            return self._read_all_simulated()
+
+        return self._read_all_real()
+
+    def _read_all_real(self) -> Dict[str, Any]:
         metrics: Dict[str, Any] = {}
         for key, obis in self.settings.obis_map.items():
             try:
@@ -131,10 +146,28 @@ class DlmsMeterReader:
                 if isinstance(value, (bytes, bytearray)):
                     value = value.hex()
                 metrics[key] = _to_numeric_if_possible(value)
-            except Exception as exc:
+            except Exception:
+                # Keep the bridge alive and return partial data when some OBIS reads fail.
                 self.logger.exception("DLMS read failed for %s (%s)", key, obis)
-                metrics[key] = None
+
+        self.logger.info("Data read: %s", metrics)
         return metrics
+
+    def _read_all_simulated(self) -> Dict[str, Any]:
+        elapsed = max(0.0, time.time() - self._simulation_started_at)
+        drift = elapsed / 30.0
+
+        metrics: Dict[str, Any] = {
+            "energy": int(self._simulation_energy_base + elapsed * 12 + random.uniform(0, 5)),
+            "voltage": round(self._simulation_voltage_base + random.uniform(-1.5, 1.5) + drift * 0.2, 2),
+            "current": round(self._simulation_current_base + random.uniform(-0.4, 0.4) + drift * 0.05, 2),
+        }
+
+        self.logger.info("Data read (simulation): %s", metrics)
+        return metrics
+
+    def read_metrics(self) -> Dict[str, Any]:
+        return self.read_all()
 
     def close(self) -> None:
         if self.ser:

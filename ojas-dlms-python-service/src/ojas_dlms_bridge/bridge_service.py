@@ -1,4 +1,5 @@
 import logging
+import json
 import time
 from typing import Dict, Any
 
@@ -8,46 +9,56 @@ from .settings import BridgeSettings
 
 
 class DlmsMqttBridgeService:
-    def __init__(self, settings: BridgeSettings, logger: logging.Logger) -> None:
+    def __init__(
+        self,
+        settings: BridgeSettings,
+        reader: DlmsMeterReader,
+        publisher: MqttPublisher,
+        logger: logging.Logger,
+    ) -> None:
         self.settings = settings
         self.logger = logger
-        self.reader = DlmsMeterReader(settings.dlms, logger)
-        self.publisher = MqttPublisher(settings.mqtt, logger)
+        self.reader = reader
+        self.publisher = publisher
         self.running = False
 
     def run_forever(self) -> None:
-        self.publisher.connect()
+        try:
+            self.publisher.connect()
+        except Exception:
+            self.logger.exception("Initial MQTT connect failed; continuing with retries")
+
         self.running = True
 
         while self.running:
             try:
-                if not self.publisher.connected and not self.publisher.wait_until_connected(timeout_sec=10):
+                if not self.publisher.wait_until_connected(timeout_sec=10):
                     self.logger.warning("MQTT not connected yet; retrying")
                     time.sleep(self.settings.retry_delay_sec)
                     continue
 
                 self.reader.connect()
-                metrics = self.reader.read_metrics()
+                metrics = self.reader.read_all()
+
+                if not metrics:
+                    self.logger.warning("No DLMS data available in this cycle")
+                    time.sleep(self.settings.retry_delay_sec)
+                    continue
 
                 payload: Dict[str, Any] = {
-                    "voltage": metrics.get("voltage"),
-                    "current": metrics.get("current"),
-                    "energy": metrics.get("energy"),
-                    "timestamp": int(time.time() * 1000),
+                    **metrics,
+                    "timestamp": int(time.time()),
                 }
 
-                # Add optional extra fields when available.
-                for extra_key in ("power", "frequency", "powerFactor", "temperature"):
-                    if extra_key in metrics:
-                        payload[extra_key] = metrics[extra_key]
-
-                ok = self.publisher.publish_json(self.settings.publish_topic, payload, qos=1)
+                ok = self.publisher.publish(self.settings.publish_topic, json.dumps(payload), qos=1)
                 if ok:
                     self.logger.info("Bridge cycle completed for device=%s", self.settings.device_id)
+                else:
+                    self.logger.warning("Publish failed; bridge will retry")
 
                 time.sleep(self.settings.poll_interval_sec)
-            except Exception as exc:
-                self.logger.exception("Bridge cycle failed: %s", exc)
+            except Exception:
+                self.logger.exception("Bridge cycle failed")
                 self.reader.close()
                 time.sleep(self.settings.retry_delay_sec)
 
