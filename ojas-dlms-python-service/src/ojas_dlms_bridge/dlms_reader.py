@@ -35,6 +35,49 @@ _SECURITY_MAP = {
     "AUTHENTICATION_ENCRYPTION": Security.AUTHENTICATION_ENCRYPTION,
 }
 
+_OBIS_MAP = {
+    "energy": "1.0.1.8.0.255",
+    "voltage": "1.0.32.7.0.255",
+    "current": "1.0.31.7.0.255",
+}
+
+
+class DlmsCommandGenerator:
+    """Generate DLMS HEX commands using Gurux client."""
+
+    def __init__(self, client: GXDLMSClient, logger: logging.Logger) -> None:
+        self.client = client
+        self.logger = logger
+
+    def generate_get_command(self, obis: str, attribute: int = 2) -> str:
+        """
+        Generate a DLMS GET request in HEX format.
+
+        Args:
+            obis: OBIS code (e.g., "1.0.32.7.0.255")
+            attribute: DLMS attribute index (default: 2)
+
+        Returns:
+            HEX string of the GET request
+        """
+        if not self.client:
+            raise RuntimeError("DLMS client is not connected")
+
+        try:
+            obj = GXDLMSRegister(obis)
+            req = self.client.read(obj, attribute)
+
+            # Ensure it's a list and get first element
+            if isinstance(req, list):
+                req = req[0]
+
+            hex_cmd = req.hex()
+            self.logger.debug("DLMS command generated for %s (attr=%d): %s", obis, attribute, hex_cmd)
+            return hex_cmd
+        except Exception as exc:
+            self.logger.exception("Failed to generate command for %s: %s", obis, exc)
+            raise
+
 
 class DlmsMeterReader:
     def __init__(self, settings: DlmsSettings, logger: logging.Logger) -> None:
@@ -42,6 +85,7 @@ class DlmsMeterReader:
         self.logger = logger
         self.ser = None
         self.client = None
+        self.cmd_generator = None
         self._simulation_started_at = time.time()
         self._simulation_energy_base = random.randint(1000, 100000)
         self._simulation_voltage_base = random.uniform(228.0, 232.0)
@@ -86,6 +130,9 @@ class DlmsMeterReader:
 
         self.client.ciphering = cipher
         self.client.settings.cipher = cipher
+
+        # Initialize command generator after client is ready
+        self.cmd_generator = DlmsCommandGenerator(self.client, self.logger)
 
         aarq = self.client.aarqRequest()
         aare = self._send_and_receive(aarq, "AARQ")
@@ -169,6 +216,50 @@ class DlmsMeterReader:
     def read_metrics(self) -> Dict[str, Any]:
         return self.read_all()
 
+    def generate_command(self, parameter: str, attribute: int = 2) -> str:
+        """
+        Generate a DLMS GET command for a named parameter.
+
+        Args:
+            parameter: Parameter name (e.g., "voltage", "energy", "current")
+            attribute: DLMS attribute index (default: 2)
+
+        Returns:
+            HEX string of the DLMS GET command
+
+        Raises:
+            ValueError: If parameter is not recognized
+            RuntimeError: If DLMS client is not connected (only in real mode)
+        """
+        if parameter not in _OBIS_MAP:
+            raise ValueError(
+                f"Unknown parameter: {parameter}. "
+                f"Available: {', '.join(_OBIS_MAP.keys())}"
+            )
+
+        obis = _OBIS_MAP[parameter]
+
+        if getattr(self.settings, "simulation", False):
+            self.logger.info(
+                "[DLMS CMD] %s (simulation mode): using mock command generation",
+                parameter,
+            )
+            return self._generate_command_simulated(parameter, obis)
+
+        if not self.cmd_generator:
+            raise RuntimeError("DLMS client is not initialized. Call connect() first.")
+
+        hex_cmd = self.cmd_generator.generate_get_command(obis, attribute)
+        self.logger.info("[DLMS CMD] %s: %s", parameter, hex_cmd)
+        return hex_cmd
+
+    def _generate_command_simulated(self, parameter: str, obis: str) -> str:
+        """Generate a mock DLMS command for testing (simulation mode)."""
+        # Return a simple mock GET request frame in hex
+        # This is a placeholder; real frame generation happens via Gurux
+        mock_hex = f"c0c101{obis.replace('.', '')}"
+        return mock_hex
+
     def close(self) -> None:
         if self.ser:
             try:
@@ -177,6 +268,7 @@ class DlmsMeterReader:
                 pass
         self.ser = None
         self.client = None
+        self.cmd_generator = None
 
 
 def _to_numeric_if_possible(value: Any) -> Any:

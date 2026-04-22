@@ -11,6 +11,42 @@ const TELEMETRY_CACHE_KEY = 'ojas_recent_telemetry_by_device'
 const TELEMETRY_PAYLOAD_CACHE_KEY = 'ojas_recent_telemetry_payload_by_device'
 const TELEMETRY_HISTORY_CACHE_KEY = 'ojas_recent_telemetry_history_by_device'
 
+const toEpochMs = (value) => {
+  if (value === undefined || value === null || value === '') {
+    return null
+  }
+
+  if (value instanceof Date) {
+    const ms = value.getTime()
+    return Number.isFinite(ms) ? ms : null
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value < 1e12 ? Math.round(value * 1000) : Math.round(value)
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return null
+
+    if (/^\d+(\.\d+)?$/.test(trimmed)) {
+      const numeric = Number(trimmed)
+      if (!Number.isFinite(numeric)) return null
+      return numeric < 1e12 ? Math.round(numeric * 1000) : Math.round(numeric)
+    }
+
+    const parsed = Date.parse(trimmed)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
+  return null
+}
+
+const toIsoTimestamp = (value) => {
+  const ms = toEpochMs(value)
+  return ms ? new Date(ms).toISOString() : new Date().toISOString()
+}
+
 const readTelemetryCache = () => {
   try {
     const raw = localStorage.getItem(TELEMETRY_CACHE_KEY)
@@ -95,7 +131,11 @@ export default function DeviceDetailPage() {
         const cachedHistory = Array.isArray(historyCache[res.deviceId]) ? historyCache[res.deviceId] : []
         const mergedHistory = [...history, ...cachedHistory]
           .filter((item) => item && (item.timestamp || item.createdAt || item.updatedAt))
-          .sort((a, b) => new Date(b.timestamp || b.createdAt || b.updatedAt) - new Date(a.timestamp || a.createdAt || a.updatedAt))
+          .sort(
+            (a, b) =>
+              (toEpochMs(b.timestamp || b.createdAt || b.updatedAt) || 0)
+              - (toEpochMs(a.timestamp || a.createdAt || a.updatedAt) || 0),
+          )
 
         const dedupedHistory = []
         const seen = new Set()
@@ -200,28 +240,34 @@ export default function DeviceDetailPage() {
       console.log('Incoming:', topic, message.toString())
       try {
         const parsed = JSON.parse(message.toString())
+        const normalizedTimestamp = toIsoTimestamp(parsed.timestamp)
         console.log('MQTT message received:', topic, parsed)
         setTelemetry((prev) => ({
           ...prev,
           ...parsed,
+          timestamp: normalizedTimestamp,
         }))
 
         setTelemetryHistory((prev) => [
           ...prev,
           {
             ...parsed,
-            timestamp: parsed.timestamp || new Date().toISOString(),
+            timestamp: normalizedTimestamp,
           },
-        ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 500))
+        ]
+          .sort((a, b) => (toEpochMs(b.timestamp) || 0) - (toEpochMs(a.timestamp) || 0))
+          .slice(0, 500))
 
         const historyCache = readTelemetryHistoryCache()
         historyCache[device?.deviceId || deviceId] = [
           ...(historyCache[device?.deviceId || deviceId] || []),
           {
             ...parsed,
-            timestamp: parsed.timestamp || new Date().toISOString(),
+            timestamp: normalizedTimestamp,
           },
-        ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 500)
+        ]
+          .sort((a, b) => (toEpochMs(b.timestamp) || 0) - (toEpochMs(a.timestamp) || 0))
+          .slice(0, 500)
         writeTelemetryHistoryCache(historyCache)
 
         const payloadCache = readTelemetryPayloadCache()
@@ -300,8 +346,8 @@ export default function DeviceDetailPage() {
     .slice()
     .reverse()
     .map((item) => {
-      const ts = item?.timestamp ? new Date(item.timestamp) : null
-      const validTs = ts && !Number.isNaN(ts.getTime()) ? ts : null
+      const tsMs = toEpochMs(item?.timestamp)
+      const validTs = tsMs ? new Date(tsMs) : null
       return {
         day: validTs ? validTs.toLocaleString() : 'Unknown',
         voltage: item?.voltage ?? null,
