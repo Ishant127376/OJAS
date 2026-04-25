@@ -1,7 +1,7 @@
-import logging
 import json
+import logging
 import time
-from typing import Dict, Any
+from typing import Any, Dict
 
 from .dlms_reader import DlmsMeterReader
 from .mqtt_publisher import MqttPublisher
@@ -23,43 +23,40 @@ class DlmsMqttBridgeService:
         self.running = False
 
     def run_forever(self) -> None:
+        self.running = True
+
         try:
             self.publisher.connect()
         except Exception:
-            self.logger.exception("Initial MQTT connect failed; continuing with retries")
-
-        self.running = True
+            self.logger.exception("Initial MQTT connect failed; bridge will retry")
 
         while self.running:
             try:
-                if not self.publisher.wait_until_connected(timeout_sec=10):
-                    self.logger.warning("MQTT not connected yet; retrying")
-                    time.sleep(self.settings.retry_delay_sec)
-                    continue
-
-                self.reader.connect()
-                metrics = self.reader.read_all()
-
-                if not metrics:
-                    self.logger.warning("No DLMS data available in this cycle")
-                    time.sleep(self.settings.retry_delay_sec)
-                    continue
+                data = self.reader.read_all()
 
                 payload: Dict[str, Any] = {
-                    **metrics,
+                    **data,
                     "timestamp": int(time.time()),
                 }
 
-                ok = self.publisher.publish(self.settings.publish_topic, json.dumps(payload), qos=1)
-                if ok:
-                    self.logger.info("Bridge cycle completed for device=%s", self.settings.device_id)
-                else:
-                    self.logger.warning("Publish failed; bridge will retry")
+                published = self.publisher.publish(self.settings.publish_topic, json.dumps(payload), qos=1)
+                if not published:
+                    raise RuntimeError("MQTT publish failed")
 
+                self.logger.info(
+                    "Data published to %s: %s",
+                    self.settings.publish_topic,
+                    payload,
+                )
+                self.logger.info("Bridge cycle completed for device=%s", self.settings.device_id)
                 time.sleep(self.settings.poll_interval_sec)
             except Exception:
-                self.logger.exception("Bridge cycle failed")
+                self.logger.exception("Bridge cycle failed; reconnecting DLMS and MQTT")
                 self.reader.close()
+                try:
+                    self.publisher.connect()
+                except Exception:
+                    self.logger.exception("MQTT reconnect attempt failed")
                 time.sleep(self.settings.retry_delay_sec)
 
     def stop(self) -> None:

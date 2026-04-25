@@ -162,6 +162,21 @@ export const updateDevice = async (id, updates) => {
   return Promise.resolve({ deviceId: id, ...updates })
 }
 
+export const generateHandshake = async (deviceId) => {
+  const response = await fetch(`${API_BASE_URL}/dlms/handshake`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ deviceId }),
+  })
+
+  const json = await response.json().catch(() => null)
+  if (!response.ok || !json?.success) {
+    throw new Error(json?.error?.message || 'Failed to generate handshake')
+  }
+
+  return json.aarq
+}
+
 export const deleteDevice = async (id) => {
   console.log('Delete device:', id)
   // Backend doesn't have delete endpoint yet

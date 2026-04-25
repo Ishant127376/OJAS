@@ -2,7 +2,7 @@ import mqtt from 'mqtt'
 import { ArrowLeft, Download } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getDeviceById, getTelemetryHistory } from '../services/device.service'
+import { generateHandshake, getDeviceById, getTelemetryHistory } from '../services/device.service'
 import Loader from '../components/common/Loader'
 import HistoryChart from '../components/charts/HistoryChart'
 import { timeAgo } from '../utils/timeAgo'
@@ -109,6 +109,9 @@ export default function DeviceDetailPage() {
   const [lastSeen, setLastSeen] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [handshakeHex, setHandshakeHex] = useState('')
+  const [handshakeLoading, setHandshakeLoading] = useState(false)
+  const [handshakeError, setHandshakeError] = useState('')
   const [, forceUpdate] = useState(0)
   const clientRef = useRef(null)
   const cleanupTimerRef = useRef(null)
@@ -391,6 +394,20 @@ export default function DeviceDetailPage() {
     URL.revokeObjectURL(url)
   }
 
+  const handleGenerateHandshake = async () => {
+    try {
+      setHandshakeError('')
+      setHandshakeLoading(true)
+      const aarq = await generateHandshake(device?.deviceId || deviceId)
+      setHandshakeHex(aarq)
+      console.log('TX:', aarq)
+    } catch (err) {
+      setHandshakeError(err?.message || 'Failed to generate handshake')
+    } finally {
+      setHandshakeLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -460,6 +477,14 @@ export default function DeviceDetailPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-textPrimary">History</h2>
           <div className="flex items-center gap-3">
+            <button
+              onClick={handleGenerateHandshake}
+              className="inline-flex items-center gap-2 rounded-md bg-surface px-3 py-2 text-sm font-medium text-textPrimary border border-border/40 hover:bg-surface/80"
+              type="button"
+              disabled={handshakeLoading}
+            >
+              {handshakeLoading ? 'Generating...' : 'Generate Handshake'}
+            </button>
             <select
               value={selectedMetric}
               onChange={(e) => setSelectedMetric(e.target.value)}
@@ -479,6 +504,13 @@ export default function DeviceDetailPage() {
             </button>
           </div>
         </div>
+
+        {handshakeHex ? (
+          <p className="text-xs break-all text-textSecondary">TX: {handshakeHex}</p>
+        ) : null}
+        {handshakeError ? (
+          <p className="text-xs text-red-400">{handshakeError}</p>
+        ) : null}
 
         {historyChartData.length > 0 ? (
           <HistoryChart

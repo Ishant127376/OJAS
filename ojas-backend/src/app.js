@@ -7,6 +7,7 @@ import deviceRoutes from './routes/device.routes.js'
 import authRoutes from './routes/auth.routes.js'
 import telemetryRoutes from './routes/telemetry.routes.js'
 import adminRoutes from './routes/admin.routes.js'
+import dlmsRoutes from './routes/dlms.routes.js'
 import { getMqttClient } from './config/mqtt.js'
 import { startDlmsPolling } from './services/dlms-poller.service.js'
 import { requestLogger } from './middleware/request-logger.middleware.js'
@@ -72,6 +73,7 @@ app.use('/auth', authRoutes)
 app.use('/api/devices', deviceRoutes)
 app.use('/api/telemetry', telemetryRoutes)
 app.use('/api/admin', adminRoutes)
+app.use('/api/dlms', dlmsRoutes)
 
 // 404 handler
 app.use((req, res) => {

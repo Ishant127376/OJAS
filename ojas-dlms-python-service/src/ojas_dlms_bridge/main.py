@@ -1,12 +1,12 @@
 import logging
 import signal
 import sys
+import os
 
 from .bridge_service import DlmsMqttBridgeService
 from .dlms_reader import DlmsMeterReader
 from .mqtt_publisher import MqttPublisher
 from .settings import load_settings
-import os
 
 
 def configure_logging() -> logging.Logger:
@@ -22,26 +22,30 @@ def main() -> int:
     settings = load_settings()
 
     logger.info("Starting OJAS DLMS bridge device=%s topic=%s", settings.device_id, settings.publish_topic)
-    logger.info("Bridge mode: %s", "SIMULATION" if settings.simulation else "REAL_DLMS")
+    logger.info("Bridge mode: REAL_DLMS (%s)", settings.dlms.mode.upper())
 
     reader = DlmsMeterReader(settings.dlms, logger)
     publisher = MqttPublisher(settings.mqtt, logger)
     service = DlmsMqttBridgeService(settings, reader, publisher, logger)
-    # ===== DLMS COMMAND TEST BLOCK (removable debug section) =====
-    if os.getenv("OJAS_SHOW_DLMS_COMMANDS", "").lower() == "true":
-        logger.info("=== DLMS COMMAND TEST ===")
+
+    if os.getenv("OJAS_DEBUG_DLMS", "").lower() == "true":
         try:
-            reader.connect()
-            for param in ["voltage", "current", "energy"]:
-                try:
-                    cmd = reader.generate_command(param)
-                    logger.info("%s: %s", param, cmd)
-                except Exception as exc:
-                    logger.warning("%s: ERROR -> %s", param, exc)
-        except Exception as exc:
-            logger.warning("DLMS command test failed: %s", exc)
-        logger.info("=== DLMS COMMAND TEST END ===")
-    # ===== END DLMS COMMAND TEST BLOCK =====
+            commands = reader.debug_generate_commands()
+            logger.info("Voltage HEX: %s", commands.get("voltage"))
+            logger.info("Current HEX: %s", commands.get("current"))
+            logger.info("Energy HEX: %s", commands.get("energy"))
+        except Exception:
+            logger.exception("DLMS debug command generation failed")
+            return 1
+        return 0
+
+    if os.getenv("OJAS_RUN_DLMS_STARTUP_TEST", "").lower() == "true":
+        logger.info("Running DLMS startup read test")
+        try:
+            test_data = reader.read_all()
+            logger.info("Startup DLMS read successful: %s", test_data)
+        except Exception:
+            logger.exception("Startup DLMS read test failed")
 
 
     def _shutdown(signum, frame):

@@ -1,6 +1,5 @@
 {
   "device_id": "END-1775462554328-4630",
-  "simulation": false,
   "poll_interval_sec": 5,
   "retry_delay_sec": 3,
   "mqtt": {
@@ -17,7 +16,10 @@
     "key": ""
   },
   "dlms": {
-    "port": "COM13",
+    "mode": "serial",
+    "ip": "192.168.1.10",
+    "port": 4059,
+    "serial_port": "COM13",
     "baudrate": 9600,
     "client_address": 32,
     "server_address": 1,

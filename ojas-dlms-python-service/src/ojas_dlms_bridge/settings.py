@@ -20,10 +20,13 @@ def _to_int(value: Any, default: int) -> int:
         return default
 
 
-def _to_bytes_from_hex(value: str, default: bytes = b"") -> bytes:
-    if not value:
-        return default
-    return bytes.fromhex(value)
+def _to_bytes_from_hex(value: str, field_name: str) -> bytes:
+    if value is None or not str(value).strip():
+        raise ValueError(f"Missing required setting: {field_name}")
+    try:
+        return bytes.fromhex(str(value).strip())
+    except ValueError as exc:
+        raise ValueError(f"Invalid hex for {field_name}") from exc
 
 
 @dataclass
@@ -43,8 +46,10 @@ class MqttSettings:
 
 @dataclass
 class DlmsSettings:
-    simulation: bool
-    port: str
+    mode: str
+    ip: str
+    tcp_port: int
+    serial_port: str
     baudrate: int
     client_address: int
     server_address: int
@@ -63,7 +68,6 @@ class DlmsSettings:
 @dataclass
 class BridgeSettings:
     device_id: str
-    simulation: bool
     topic_template: str
     poll_interval_sec: int
     retry_delay_sec: int
@@ -103,8 +107,6 @@ def load_settings() -> BridgeSettings:
         cfg.get("device_id") or os.getenv("OJAS_DEVICE_ID"),
         "device_id",
     )
-    simulation_env = os.getenv("OJAS_SIMULATION")
-    simulation = _to_bool(simulation_env if simulation_env is not None else cfg.get("simulation", False), False)
 
     mqtt_endpoint = _require_non_empty(
         mqtt_cfg.get("endpoint") or os.getenv("MQTT_ENDPOINT"),
@@ -125,10 +127,19 @@ def load_settings() -> BridgeSettings:
         "mqtt.pub_topic",
     )
 
-    dlms_port = _require_non_empty(
-        dlms_cfg.get("port") or os.getenv("DLMS_PORT"),
-        "dlms.port",
-    )
+    dlms_mode = (dlms_cfg.get("mode") or os.getenv("DLMS_MODE") or "serial").strip().lower()
+    if dlms_mode not in {"serial", "tcp"}:
+        raise ValueError("Invalid dlms.mode. Supported values: serial, tcp")
+
+    serial_port = dlms_cfg.get("serial_port") or dlms_cfg.get("port") or os.getenv("DLMS_SERIAL_PORT") or os.getenv("DLMS_PORT")
+    tcp_ip = dlms_cfg.get("ip") or os.getenv("DLMS_IP")
+    tcp_port = _to_int(dlms_cfg.get("tcp_port") or dlms_cfg.get("port") or os.getenv("DLMS_TCP_PORT") or os.getenv("DLMS_PORT"), 4059)
+
+    if dlms_mode == "serial":
+        _require_non_empty(serial_port, "dlms.serial_port")
+    if dlms_mode == "tcp":
+        _require_non_empty(tcp_ip, "dlms.ip")
+
     obis_map = dlms_cfg.get("obis_map")
     if not isinstance(obis_map, dict) or not obis_map:
         raise ValueError("Missing required setting: dlms.obis_map")
@@ -151,9 +162,17 @@ def load_settings() -> BridgeSettings:
         key=mqtt_cfg.get("key") or os.getenv("MQTT_KEY", ""),
     )
 
+    # Debug-safe defaults for ciphering material when values are not provided.
+    system_title_hex = dlms_cfg.get("system_title_hex") or os.getenv("DLMS_SYSTEM_TITLE_HEX") or "4142434431323334"
+    auth_key_hex = dlms_cfg.get("auth_key_hex") or os.getenv("DLMS_AUTH_KEY_HEX") or "30313233343536373839414243444546"
+    block_key_hex = dlms_cfg.get("block_key_hex") or os.getenv("DLMS_BLOCK_KEY_HEX") or "30313233343536373839414243444546"
+    dedicated_key_hex = dlms_cfg.get("dedicated_key_hex") or os.getenv("DLMS_DEDICATED_KEY_HEX") or "30313233343536373839414243444546"
+
     dlms = DlmsSettings(
-        simulation=simulation,
-        port=dlms_port,
+        mode=dlms_mode,
+        ip=tcp_ip or "",
+        tcp_port=tcp_port,
+        serial_port=serial_port or "",
         baudrate=_to_int(dlms_cfg.get("baudrate") or os.getenv("DLMS_BAUDRATE"), 9600),
         client_address=_to_int(dlms_cfg.get("client_address") or os.getenv("DLMS_CLIENT_ADDRESS"), 16),
         server_address=_to_int(dlms_cfg.get("server_address") or os.getenv("DLMS_SERVER_ADDRESS"), 1),
@@ -161,17 +180,16 @@ def load_settings() -> BridgeSettings:
         authentication=(dlms_cfg.get("authentication") or os.getenv("DLMS_AUTHENTICATION", "LOW")).upper(),
         security=(dlms_cfg.get("security") or os.getenv("DLMS_SECURITY", "AUTHENTICATION_ENCRYPTION")).upper(),
         password=(dlms_cfg.get("password") or os.getenv("DLMS_PASSWORD", "")).encode("utf-8"),
-        system_title=_to_bytes_from_hex(dlms_cfg.get("system_title_hex") or os.getenv("DLMS_SYSTEM_TITLE_HEX", "")),
-        auth_key=_to_bytes_from_hex(dlms_cfg.get("auth_key_hex") or os.getenv("DLMS_AUTH_KEY_HEX", "")),
-        block_key=_to_bytes_from_hex(dlms_cfg.get("block_key_hex") or os.getenv("DLMS_BLOCK_KEY_HEX", "")),
-        dedicated_key=_to_bytes_from_hex(dlms_cfg.get("dedicated_key_hex") or os.getenv("DLMS_DEDICATED_KEY_HEX", "")),
+        system_title=_to_bytes_from_hex(system_title_hex, "dlms.system_title_hex"),
+        auth_key=_to_bytes_from_hex(auth_key_hex, "dlms.auth_key_hex"),
+        block_key=_to_bytes_from_hex(block_key_hex, "dlms.block_key_hex"),
+        dedicated_key=_to_bytes_from_hex(dedicated_key_hex, "dlms.dedicated_key_hex"),
         invocation_counter=_to_int(dlms_cfg.get("invocation_counter") or os.getenv("DLMS_INVOCATION_COUNTER"), 1),
         obis_map=obis_map,
     )
 
     return BridgeSettings(
         device_id=device_id,
-        simulation=simulation,
         topic_template=cfg.get("topic_template") or os.getenv("OJAS_TOPIC_TEMPLATE", "device/{device_id}/telemetry"),
         poll_interval_sec=poll_interval_sec,
         retry_delay_sec=_to_int(cfg.get("retry_delay_sec") or os.getenv("OJAS_RETRY_DELAY_SEC"), 3),
